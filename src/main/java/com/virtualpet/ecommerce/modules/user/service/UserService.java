@@ -101,6 +101,13 @@ public class UserService {
         return mapToUserResponse(user);
     }
 
+    // Obtener usuario por ID (API pública para otros módulos)
+    public UserResponse getUserById(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return mapToUserResponse(user);
+    }
+
     // Actualizar perfil
     @Transactional
     public UserResponse updateProfile(String email, UpdateProfileRequest request) {

@@ -1,0 +1,35 @@
+### Spring Boot ###
+/target/
+/build/
+/out/
+
+### IDEs ###
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+### System files ###
+.DS_Store
+Thumbs.db
+*~
+
+### Logs ###
+logs/
+*.log
+
+### Env & secrets ###
+.env
+*.env
+application-local.properties
+application-local.yml
+application-dev.properties
+application-dev.yml
+
+### Generated packages ###
+*.jar
+*.war
+*.zip
+*.tar

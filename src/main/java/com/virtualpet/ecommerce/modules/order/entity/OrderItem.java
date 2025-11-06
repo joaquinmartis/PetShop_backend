@@ -46,6 +46,20 @@ public class OrderItem {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Obtener subtotal (calculado si no está en BD)
+     */
+    public BigDecimal getSubtotal() {
+        if (subtotal != null) {
+            return subtotal;
+        }
+        // Calcular si no está en BD
+        if (unitPriceSnapshot != null && quantity != null) {
+            return unitPriceSnapshot.multiply(new BigDecimal(quantity));
+        }
+        return BigDecimal.ZERO;
+    }
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

@@ -14,6 +14,7 @@ import com.virtualpet.ecommerce.modules.product.dto.StockItem;
 import com.virtualpet.ecommerce.modules.product.service.ProductService;
 import com.virtualpet.ecommerce.modules.user.dto.UserResponse;
 import com.virtualpet.ecommerce.modules.user.service.UserService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -59,7 +60,7 @@ public class OrderService {
         Cart cart = cartService.getCartEntity(userId);
 
         if (cart.getItems().isEmpty()) {
-            throw new RuntimeException("El carrito está vacío");
+            throw new IllegalArgumentException("El carrito está vacío");
         }
 
         // 3. Validar stock de todos los productos
@@ -78,7 +79,7 @@ public class OrderService {
                             product.getRequestedQuantity(),
                             product.getAvailableStock()))
             );
-            throw new RuntimeException(errorMessage.toString());
+            throw new IllegalArgumentException(errorMessage.toString());
         }
 
         // 4. Crear el pedido
@@ -153,7 +154,7 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long userId, Long orderId) {
         Order order = orderRepository.findByIdAndUserId(orderId, userId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
         // Cargar items si no están cargados
         order = orderRepository.findByIdWithItems(orderId).orElseThrow();
@@ -167,15 +168,15 @@ public class OrderService {
     @Transactional
     public OrderResponse cancelOrder(Long userId, Long orderId, CancelOrderRequest request) {
         Order order = orderRepository.findByIdAndUserId(orderId, userId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
         // Validar que el pedido pueda ser cancelado
         if (order.getStatus() == Order.OrderStatus.CANCELLED) {
-            throw new RuntimeException("El pedido ya está cancelado");
+            throw new IllegalArgumentException("El pedido ya está cancelado");
         }
 
         if (order.getStatus() == Order.OrderStatus.SHIPPED || order.getStatus() == Order.OrderStatus.DELIVERED) {
-            throw new RuntimeException("No puedes cancelar un pedido que ya fue despachado o entregado");
+            throw new IllegalArgumentException("No puedes cancelar un pedido que ya fue despachado o entregado");
         }
 
         // Cargar items
@@ -226,7 +227,7 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderResponse getOrderByIdAdmin(Long orderId) {
         Order order = orderRepository.findByIdWithItems(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
         return mapToOrderResponse(order);
     }
 
@@ -236,10 +237,10 @@ public class OrderService {
     @Transactional
     public OrderResponse markReadyToShip(Long orderId, Long warehouseUserId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
         if (order.getStatus() != Order.OrderStatus.CONFIRMED) {
-            throw new RuntimeException("Solo se pueden marcar como listos los pedidos confirmados");
+            throw new IllegalArgumentException("Solo se pueden marcar como listos los pedidos confirmados");
         }
 
         Order.OrderStatus previousStatus = order.getStatus();
@@ -257,10 +258,10 @@ public class OrderService {
     @Transactional
     public OrderResponse markShipped(Long orderId, Long warehouseUserId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
         if (order.getStatus() != Order.OrderStatus.READY_TO_SHIP) {
-            throw new RuntimeException("Solo se pueden despachar pedidos listos para enviar");
+            throw new IllegalArgumentException("Solo se pueden despachar pedidos listos para enviar");
         }
 
         Order.OrderStatus previousStatus = order.getStatus();
@@ -278,10 +279,10 @@ public class OrderService {
     @Transactional
     public OrderResponse markDelivered(Long orderId, Long warehouseUserId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
         if (order.getStatus() != Order.OrderStatus.SHIPPED) {
-            throw new RuntimeException("Solo se pueden entregar pedidos despachados");
+            throw new IllegalArgumentException("Solo se pueden entregar pedidos despachados");
         }
 
         Order.OrderStatus previousStatus = order.getStatus();
@@ -299,7 +300,7 @@ public class OrderService {
     @Transactional
     public OrderResponse updateShippingMethod(Long orderId, UpdateShippingMethodRequest request, Long warehouseUserId) {
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
         try {
             Order.ShippingMethod method = Order.ShippingMethod.valueOf(request.getShippingMethod().toUpperCase());
@@ -308,7 +309,7 @@ public class OrderService {
 
             return mapToOrderResponse(order);
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Método de envío inválido. Debe ser OWN_TEAM o COURIER");
+            throw new IllegalArgumentException("Método de envío inválido. Debe ser OWN_TEAM o COURIER");
         }
     }
 
@@ -318,10 +319,10 @@ public class OrderService {
     @Transactional
     public OrderResponse rejectOrder(Long orderId, CancelOrderRequest request, Long warehouseUserId) {
         Order order = orderRepository.findByIdWithItems(orderId)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
         if (order.getStatus() == Order.OrderStatus.CANCELLED) {
-            throw new RuntimeException("El pedido ya está cancelado");
+            throw new IllegalArgumentException("El pedido ya está cancelado");
         }
 
         Order.OrderStatus previousStatus = order.getStatus();

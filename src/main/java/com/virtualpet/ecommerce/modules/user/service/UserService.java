@@ -37,7 +37,7 @@ public class UserService {
     public UserResponse register(RegisterRequest request) {
         // Verificar si el email ya existe
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("El email ya está registrado");
+            throw new IllegalStateException("El email ya está registrado");
         }
 
         // Obtener rol CLIENT por defecto

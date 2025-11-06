@@ -35,6 +35,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/register", "/api/users/login").permitAll()
                         .requestMatchers("/api/products/**", "/api/categories/**").permitAll()
 
+                        // Swagger / OpenAPI
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html", "/api-docs/**").permitAll()
+
                         // Endpoints de backoffice (solo WAREHOUSE)
                         .requestMatchers("/api/backoffice/**").hasRole("WAREHOUSE")
 

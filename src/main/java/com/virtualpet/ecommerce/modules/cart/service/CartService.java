@@ -7,6 +7,7 @@ import com.virtualpet.ecommerce.modules.cart.repository.CartItemRepository;
 import com.virtualpet.ecommerce.modules.cart.repository.CartRepository;
 import com.virtualpet.ecommerce.modules.product.dto.ProductResponse;
 import com.virtualpet.ecommerce.modules.product.service.ProductService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,7 +35,7 @@ public class CartService {
     /**
      * Obtener carrito del usuario (o crear uno nuevo si no existe)
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public CartResponse getCart(Long userId) {
         Cart cart = cartRepository.findByUserIdWithItems(userId)
                 .orElseGet(() -> createNewCart(userId));
@@ -46,12 +47,17 @@ public class CartService {
      */
     @Transactional
     public CartResponse addToCart(Long userId, AddToCartRequest request) {
+        // Validar cantidad
+        if (request.getQuantity() <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor a 0");
+        }
+
         // Obtener información del producto desde Product Service
         ProductResponse product = productService.getProductById(request.getProductId());
 
         // Validar que haya stock suficiente
         if (product.getStock() < request.getQuantity()) {
-            throw new RuntimeException("Stock insuficiente. Disponible: " + product.getStock());
+            throw new IllegalArgumentException("Stock insuficiente. Disponible: " + product.getStock());
         }
 
         // Obtener o crear carrito
@@ -69,7 +75,7 @@ public class CartService {
 
             // Validar stock para la nueva cantidad
             if (product.getStock() < newQuantity) {
-                throw new RuntimeException("Stock insuficiente para la cantidad solicitada. Disponible: "
+                throw new IllegalArgumentException("Stock insuficiente para la cantidad solicitada. Disponible: "
                         + product.getStock() + ", en carrito: " + existingItem.getQuantity());
             }
 
@@ -98,16 +104,21 @@ public class CartService {
      */
     @Transactional
     public CartResponse updateCartItem(Long userId, Long productId, UpdateCartItemRequest request) {
+        // Validar cantidad
+        if (request.getQuantity() <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor a 0");
+        }
+
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Carrito no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Carrito no encontrado"));
 
         CartItem item = cartItemRepository.findByCartIdAndProductId(cart.getId(), productId)
-                .orElseThrow(() -> new RuntimeException("Producto no encontrado en el carrito"));
+                .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado en el carrito"));
 
         // Validar stock disponible
         ProductResponse product = productService.getProductById(productId);
         if (product.getStock() < request.getQuantity()) {
-            throw new RuntimeException("Stock insuficiente. Disponible: " + product.getStock());
+            throw new IllegalArgumentException("Stock insuficiente. Disponible: " + product.getStock());
         }
 
         item.setQuantity(request.getQuantity());
@@ -124,12 +135,12 @@ public class CartService {
     @Transactional
     public CartResponse removeFromCart(Long userId, Long productId) {
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Carrito no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Carrito no encontrado"));
 
         int deleted = cartItemRepository.deleteByCartIdAndProductId(cart.getId(), productId);
 
         if (deleted == 0) {
-            throw new RuntimeException("Producto no encontrado en el carrito");
+            throw new EntityNotFoundException("Producto no encontrado en el carrito");
         }
 
         // Recargar carrito
@@ -143,7 +154,7 @@ public class CartService {
     @Transactional
     public void clearCart(Long userId) {
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Carrito no encontrado"));
+                .orElseThrow(() -> new EntityNotFoundException("Carrito no encontrado"));
 
         cartItemRepository.deleteAllByCartId(cart.getId());
     }
@@ -158,7 +169,7 @@ public class CartService {
     @Transactional(readOnly = true)
     public Cart getCartEntity(Long userId) {
         return cartRepository.findByUserIdWithItems(userId)
-                .orElseThrow(() -> new RuntimeException("Carrito no encontrado para el usuario"));
+                .orElseThrow(() -> new EntityNotFoundException("Carrito no encontrado para el usuario"));
     }
 
     /**

@@ -6,9 +6,16 @@ import com.virtualpet.ecommerce.modules.cart.dto.UpdateCartItemRequest;
 import com.virtualpet.ecommerce.modules.cart.service.CartService;
 import com.virtualpet.ecommerce.modules.user.dto.ErrorResponse;
 import com.virtualpet.ecommerce.modules.user.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +23,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/cart")
 @CrossOrigin(origins = "*")
+@Tag(name = "Cart", description = "Gestión del carrito de compras")
+@SecurityRequirement(name = "Bearer Authentication")
 public class CartController {
 
     @Autowired
@@ -24,121 +33,193 @@ public class CartController {
     @Autowired
     private UserService userService;
 
-    /**
-     * GET /api/cart
-     * Obtener carrito del usuario autenticado
-     */
+    @Operation(
+            summary = "Obtener carrito",
+            description = "Retorna el carrito de compras del usuario autenticado"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Carrito obtenido exitosamente",
+                    content = @Content(schema = @Schema(implementation = CartResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Error al obtener el carrito",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
     @GetMapping
-    public ResponseEntity<?> getCart(Authentication authentication) {
-        try {
-            String email = authentication.getName();
-            Long userId = userService.getProfile(email).getId();
+    public ResponseEntity<CartResponse> getCart(Authentication authentication) {
+        String email = authentication.getName();
+        Long userId = userService.getProfile(email).getId();
 
-            CartResponse cart = cartService.getCart(userId);
-            return ResponseEntity.ok(cart);
-        } catch (RuntimeException e) {
-            ErrorResponse error = ErrorResponse.builder()
-                    .error("CartError")
-                    .message(e.getMessage())
-                    .build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+        CartResponse cart = cartService.getCart(userId);
+        return ResponseEntity.ok(cart);
     }
 
-    /**
-     * POST /api/cart/items
-     * Agregar producto al carrito
-     */
+    @Operation(
+            summary = "Agregar producto al carrito",
+            description = "Agrega un producto al carrito o actualiza su cantidad si ya existe"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Producto agregado exitosamente",
+                    content = @Content(schema = @Schema(implementation = CartResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Stock insuficiente o producto inválido",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
     @PostMapping("/items")
-    public ResponseEntity<?> addToCart(
+    public ResponseEntity<CartResponse> addToCart(
             @Valid @RequestBody AddToCartRequest request,
             Authentication authentication) {
-        try {
-            String email = authentication.getName();
-            Long userId = userService.getProfile(email).getId();
+        String email = authentication.getName();
+        Long userId = userService.getProfile(email).getId();
 
-            CartResponse cart = cartService.addToCart(userId, request);
-            return ResponseEntity.ok(cart);
-        } catch (RuntimeException e) {
-            ErrorResponse error = ErrorResponse.builder()
-                    .error("CartError")
-                    .message(e.getMessage())
-                    .build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+        CartResponse cart = cartService.addToCart(userId, request);
+        return ResponseEntity.ok(cart);
     }
 
-    /**
-     * PATCH /api/cart/items/{productId}
-     * Actualizar cantidad de un producto en el carrito
-     */
+    @Operation(
+            summary = "Actualizar cantidad de producto",
+            description = "Actualiza la cantidad de un producto específico en el carrito"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Cantidad actualizada exitosamente",
+                    content = @Content(schema = @Schema(implementation = CartResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Stock insuficiente o producto no encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
     @PatchMapping("/items/{productId}")
-    public ResponseEntity<?> updateCartItem(
-            @PathVariable Long productId,
+    public ResponseEntity<CartResponse> updateCartItem(
+            @Parameter(description = "ID del producto") @PathVariable Long productId,
             @Valid @RequestBody UpdateCartItemRequest request,
             Authentication authentication) {
-        try {
-            String email = authentication.getName();
-            Long userId = userService.getProfile(email).getId();
+        String email = authentication.getName();
+        Long userId = userService.getProfile(email).getId();
 
-            CartResponse cart = cartService.updateCartItem(userId, productId, request);
-            return ResponseEntity.ok(cart);
-        } catch (RuntimeException e) {
-            ErrorResponse error = ErrorResponse.builder()
-                    .error("CartError")
-                    .message(e.getMessage())
-                    .build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+        CartResponse cart = cartService.updateCartItem(userId, productId, request);
+        return ResponseEntity.ok(cart);
     }
 
-    /**
-     * DELETE /api/cart/items/{productId}
-     * Eliminar un producto del carrito
-     */
+    @Operation(
+            summary = "Eliminar producto del carrito",
+            description = "Elimina un producto específico del carrito"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Producto eliminado exitosamente",
+                    content = @Content(schema = @Schema(implementation = CartResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Error al eliminar el producto",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
     @DeleteMapping("/items/{productId}")
-    public ResponseEntity<?> removeFromCart(
-            @PathVariable Long productId,
+    public ResponseEntity<CartResponse> removeFromCart(
+            @Parameter(description = "ID del producto a eliminar") @PathVariable Long productId,
             Authentication authentication) {
-        try {
-            String email = authentication.getName();
-            Long userId = userService.getProfile(email).getId();
+        String email = authentication.getName();
+        Long userId = userService.getProfile(email).getId();
 
-            CartResponse cart = cartService.removeFromCart(userId, productId);
-            return ResponseEntity.ok(cart);
-        } catch (RuntimeException e) {
-            ErrorResponse error = ErrorResponse.builder()
-                    .error("CartError")
-                    .message(e.getMessage())
-                    .build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+        CartResponse cart = cartService.removeFromCart(userId, productId);
+        return ResponseEntity.ok(cart);
     }
 
-    /**
-     * DELETE /api/cart/clear
-     * Vaciar carrito completo
-     */
+    @Operation(
+            summary = "Vaciar carrito",
+            description = "Elimina todos los productos del carrito"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Carrito vaciado exitosamente",
+                    content = @Content(schema = @Schema(implementation = MessageResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Error al vaciar el carrito",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
     @DeleteMapping("/clear")
-    public ResponseEntity<?> clearCart(Authentication authentication) {
-        try {
-            String email = authentication.getName();
-            Long userId = userService.getProfile(email).getId();
+    public ResponseEntity<MessageResponse> clearCart(Authentication authentication) {
+        String email = authentication.getName();
+        Long userId = userService.getProfile(email).getId();
 
-            cartService.clearCart(userId);
+        cartService.clearCart(userId);
 
-            return ResponseEntity.ok().body(new MessageResponse("Carrito vaciado exitosamente"));
-        } catch (RuntimeException e) {
-            ErrorResponse error = ErrorResponse.builder()
-                    .error("CartError")
-                    .message(e.getMessage())
-                    .build();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
+        return ResponseEntity.ok().body(new MessageResponse("Carrito vaciado exitosamente"));
     }
 
     // Clase interna para respuestas simples
-    private static class MessageResponse {
+    @Schema(description = "Respuesta simple con mensaje de texto")
+    public static class MessageResponse {
+        @Schema(description = "Mensaje de respuesta", example = "Carrito vaciado exitosamente")
         private String message;
 
         public MessageResponse(String message) {

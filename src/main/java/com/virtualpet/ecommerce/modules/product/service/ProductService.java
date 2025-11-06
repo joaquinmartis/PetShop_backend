@@ -5,6 +5,7 @@ import com.virtualpet.ecommerce.modules.product.entity.Category;
 import com.virtualpet.ecommerce.modules.product.entity.Product;
 import com.virtualpet.ecommerce.modules.product.repository.CategoryRepository;
 import com.virtualpet.ecommerce.modules.product.repository.ProductRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -42,7 +43,7 @@ public class ProductService {
      */
     public ProductResponse getProductById(Long productId) {
         Product product = productRepository.findByIdAndActiveTrue(productId)
-                .orElseThrow(() -> new RuntimeException("Producto no encontrado o inactivo"));
+                .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado o inactivo"));
         return mapToProductResponse(product);
     }
 
@@ -95,7 +96,7 @@ public class ProductService {
 
         for (StockItem item : items) {
             Product product = productRepository.findById(item.getProductId())
-                    .orElseThrow(() -> new RuntimeException("Producto no encontrado: " + item.getProductId()));
+                    .orElseThrow(() -> new EntityNotFoundException("Producto no encontrado: " + item.getProductId()));
 
             if (!product.getActive()) {
                 unavailableProducts.add(CheckAvailabilityResponse.UnavailableProduct.builder()
@@ -172,7 +173,7 @@ public class ProductService {
      */
     public CategoryResponse getCategoryById(Long categoryId) {
         Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+                .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada"));
         return mapToCategoryResponse(category);
     }
 
@@ -182,7 +183,7 @@ public class ProductService {
     public Page<ProductResponse> getProductsByCategory(Long categoryId, Pageable pageable) {
         // Verificar que la categoría existe
         categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+                .orElseThrow(() -> new EntityNotFoundException("Categoría no encontrada"));
 
         return productRepository.findByCategoryIdAndActiveTrue(categoryId, pageable)
                 .map(this::mapToProductResponse);

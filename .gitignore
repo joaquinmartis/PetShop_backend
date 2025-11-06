@@ -89,6 +89,14 @@ Thumbs.db
 .env
 .env.local
 .env.production
+.env.*
+
+# Application properties with sensitive data
+application-local.properties
+application-dev.properties
+application-secrets.properties
+src/main/resources/application-local.properties
+src/main/resources/application-dev.properties
 
 # Logs
 logs/

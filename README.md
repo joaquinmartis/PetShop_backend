@@ -138,17 +138,60 @@ La aplicación estará disponible en: `http://localhost:8080`
 
 ## ⚙️ Configuración
 
+### 🔐 Variables de Entorno (RECOMENDADO)
+
+**⚠️ IMPORTANTE:** Por seguridad, NO uses credenciales hardcodeadas. Usa variables de entorno.
+
+#### Desarrollo Local
+
+1. **Copiar archivo de ejemplo:**
+```bash
+cp .env.example .env
+```
+
+2. **Editar `.env` con tus credenciales:**
+```bash
+DB_USERNAME=virtualpet_user
+DB_PASSWORD=virtualpet123
+JWT_SECRET=miClaveSecretaSuperSeguraDeAlMenos256BitsParaFirmarTokensJWT123456789
+JWT_EXPIRATION=3600000
+```
+
+3. **Cargar variables:**
+```bash
+export $(cat .env | xargs)
+```
+
+#### Producción
+
+**NUNCA uses las credenciales de desarrollo en producción.**
+
+Genera un JWT secret seguro:
+```bash
+openssl rand -base64 64
+```
+
+Configura las variables según tu plataforma:
+- **Heroku:** `heroku config:set JWT_SECRET=...`
+- **AWS:** AWS Systems Manager Parameter Store
+- **Docker:** Variables en `docker-compose.yml`
+- **Kubernetes:** ConfigMaps y Secrets
+
+📚 **Ver guía completa:** [CONFIGURATION.md](CONFIGURATION.md)
+
 ### application.properties
+
+El archivo `application.properties` usa variables de entorno con valores por defecto:
 
 ```properties
 # Base de datos
 spring.datasource.url=jdbc:postgresql://localhost:5432/virtualpet
-spring.datasource.username=virtualpet_user
-spring.datasource.password=virtualpet123
+spring.datasource.username=${DB_USERNAME:virtualpet_user}
+spring.datasource.password=${DB_PASSWORD:changeme}
 
-# JPA
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.properties.hibernate.default_schema=public
+# JWT
+jwt.secret=${JWT_SECRET:CHANGE_THIS_SECRET_IN_PRODUCTION}
+jwt.expiration=${JWT_EXPIRATION:3600000}
 
 # JWT
 jwt.secret=tu-clave-secreta-segura-de-al-menos-256-bits

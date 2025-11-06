@@ -3,14 +3,15 @@
 # ========================================
 spring.application.name=VirtualPet
 server.port=8080
+
 # ========================================
 # DATABASE CONFIGURATION
 # ========================================
-# Variables de entorno con valores por defecto para desarrollo local
-# ProducciÛn: configurar DB_USERNAME, DB_PASSWORD como variables de entorno
+# ‚ö†Ô∏è NUNCA subir credenciales reales a Git
+# Usar variables de entorno o application-local.properties
 spring.datasource.url=jdbc:postgresql://localhost:5432/virtualpet
 spring.datasource.username=${DB_USERNAME:virtualpet_user}
-spring.datasource.password=${DB_PASSWORD:virtualpet123}
+spring.datasource.password=${DB_PASSWORD:changeme}
 spring.datasource.driver-class-name=org.postgresql.Driver
 
 # JPA / HIBERNATE
@@ -22,31 +23,28 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 # ========================================
 # SECURITY / JWT
 # ========================================
-# Variables de entorno con valores por defecto para desarrollo local
-# ProducciÛn: configurar JWT_SECRET como variable de entorno con al menos 256 bits
-# Generar: openssl rand -base64 64
-jwt.secret=${JWT_SECRET:miClaveSecretaSuperSeguraDeAlMenos256BitsParaFirmarTokensJWT123456789}
+# ‚ö†Ô∏è NUNCA usar este secreto en producci√≥n
+# Generar uno √∫nico: openssl rand -base64 64
+jwt.secret=${JWT_SECRET:CHANGE_THIS_SECRET_IN_PRODUCTION}
 jwt.expiration=${JWT_EXPIRATION:3600000}
 
 # ========================================
 # SPRINGDOC / SWAGGER UI
 # ========================================
-# Ruta de la documentaciÛn OpenAPI JSON (ruta est·ndar de SpringDoc v2)
+# Ruta de la documentaci√≥n OpenAPI JSON
 springdoc.api-docs.path=/v3/api-docs
 # Ruta de Swagger UI
 springdoc.swagger-ui.path=/swagger-ui.html
-# Ordenar endpoints por mÈtodo HTTP
+# Ordenar endpoints por m√©todo HTTP
 springdoc.swagger-ui.operations-sorter=method
-# Ordenar tags alfabÈticamente
+# Ordenar tags alfab√©ticamente
 springdoc.swagger-ui.tags-sorter=alpha
-# Habilitar filtro de b˙squeda
+# Habilitar filtro de b√∫squeda
 springdoc.swagger-ui.filter=true
-# Mostrar duraciÛn de requests
+# Mostrar duraci√≥n de requests
 springdoc.swagger-ui.display-request-duration=true
-# Paths a escanear (solo controladores, NO config)
+# Paths a escanear
 springdoc.packages-to-scan=com.virtualpet.ecommerce.modules
 # Paths a incluir
 springdoc.paths-to-match=/api/**
-# Excluir clases de configuraciÛn del escaneo
-springdoc.packages-to-exclude=
 

@@ -73,33 +73,48 @@ git clone https://github.com/tu-usuario/virtual-pet.git
 cd VirtualPet
 ```
 
-#### 2️⃣ Crear base de datos PostgreSQL
+#### 2️⃣ Crear e inicializar base de datos PostgreSQL
+
+**Opción A: Script Automatizado (Recomendado) 🚀**
+
 ```bash
-# Opción 1: Crear BD y usuario manualmente
+# Un solo comando que hace todo
+./scripts/setup/init-database.sh
+```
+
+**¿Qué hace este script?**
+- ✅ Crea la base de datos `virtualpet` (si no existe)
+- ✅ Crea el usuario `virtualpet_user` con password `virtualpet123`
+- ✅ Crea 4 schemas: `user_management`, `product_catalog`, `cart`, `order_management`
+- ✅ Crea 9 tablas con todas sus relaciones, índices y constraints
+- ✅ Crea 5 funciones PL/pgSQL (actualización automática de timestamps)
+- ✅ Crea 7 triggers (automatizan `updated_at` en todas las tablas)
+- ✅ Inserta datos de ejemplo:
+  - 2 roles (CLIENT, WAREHOUSE)
+  - 4 usuarios de prueba (password: `password123`)
+  - 8 categorías de productos
+  - 35+ productos con precios y stock
+
+**Opción B: Paso a paso (Manual)**
+
+```bash
+# 1. Crear base de datos y usuario
 createdb virtualpet
-psql -U postgres
+psql -U postgres -c "CREATE USER virtualpet_user WITH PASSWORD 'virtualpet123';"
+psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE virtualpet TO virtualpet_user;"
 
-# En psql:
-CREATE USER virtualpet_user WITH PASSWORD 'virtualpet123';
-GRANT ALL PRIVILEGES ON DATABASE virtualpet TO virtualpet_user;
-\q
+# 2. Ejecutar script SQL de inicialización
+PGPASSWORD=virtualpet123 psql -U virtualpet_user -d virtualpet -h localhost \
+  -f scripts/setup/init-database.sql
 ```
 
-```bash
-# Opción 2: Usar script automatizado (si existe)
-psql -U postgres -f scripts/setup/create-database.sql
-```
+**📝 Credenciales de prueba creadas:**
+- **Cliente:** `cliente@test.com` / `password123`
+- **Warehouse:** `warehouse@test.com` / `password123`
 
-#### 3️⃣ Inicializar datos de prueba
-```bash
-# Crear usuario de prueba CLIENT
-PGPASSWORD=virtualpet123 psql -U virtualpet_user -d virtualpet -f scripts/setup/create-test-user.sql
+> **Nota:** El script `init-database.sql` está en formato `pg_dump` oficial de PostgreSQL e incluye toda la estructura avanzada (funciones, triggers, constraints complejos, columnas calculadas).
 
-# Crear usuario WAREHOUSE
-PGPASSWORD=virtualpet123 psql -U virtualpet_user -d virtualpet -f scripts/setup/create-warehouse-user.sql
-```
-
-#### 4️⃣ Configurar variables de entorno (RECOMENDADO)
+#### 3️⃣ Configurar variables de entorno (RECOMENDADO)
 ```bash
 # Copiar archivo de ejemplo
 cp .env.example .env
@@ -108,7 +123,7 @@ cp .env.example .env
 nano .env
 ```
 
-#### 5️⃣ Compilar y ejecutar
+#### 4️⃣ Compilar y ejecutar
 ```bash
 # Compilar el proyecto
 mvn clean install
@@ -120,6 +135,88 @@ mvn spring-boot:run
 ✅ **La aplicación estará disponible en:** `http://localhost:8080`
 
 ✅ **Swagger UI:** `http://localhost:8080/swagger-ui.html`
+
+---
+
+## 🗄️ Base de Datos - Características Avanzadas
+
+El script `init-database.sql` incluye características avanzadas de PostgreSQL:
+
+### 🔧 Funciones PL/pgSQL (5)
+Funciones que automatizan tareas comunes:
+```sql
+-- Actualiza automáticamente el campo updated_at
+update_updated_at_column()
+-- Actualiza el timestamp del carrito cuando cambian sus items
+update_cart_timestamp()
+```
+
+### ⚡ Triggers (7)
+Automatizan la actualización de timestamps:
+- `update_users_updated_at` - En `users`
+- `update_categories_updated_at` - En `categories`
+- `update_products_updated_at` - En `products`
+- `update_carts_updated_at` - En `carts`
+- `update_cart_items_updated_at` - En `cart_items`
+- `update_cart_on_item_change` - Actualiza carrito al modificar items
+- `update_orders_updated_at` - En `orders`
+
+**Beneficio:** No necesitas setear manualmente `updated_at` en tu código Java, el trigger lo hace automáticamente.
+
+### ✅ Constraints Complejos
+Validaciones a nivel de base de datos:
+```sql
+-- Validar estados permitidos
+CHECK (status IN ('PENDING_VALIDATION', 'CONFIRMED', 'READY_TO_SHIP', 
+                  'SHIPPED', 'DELIVERED', 'CANCELLED'))
+
+-- Validar métodos de envío
+CHECK (shipping_method IN ('OWN_TEAM', 'COURIER'))
+
+-- Validar consistencia de cancelación
+CHECK ((status = 'CANCELLED' AND cancellation_reason IS NOT NULL) 
+       OR (status <> 'CANCELLED' AND cancellation_reason IS NULL))
+```
+
+### 🧮 Columnas Calculadas
+```sql
+-- En order_items: subtotal se calcula automáticamente
+subtotal NUMERIC(10,2) GENERATED ALWAYS AS (quantity * unit_price_snapshot) STORED
+```
+
+**Beneficio:** El subtotal siempre está sincronizado, no puede haber inconsistencias.
+
+### 🔍 Índices para Rendimiento (20+)
+Todos los campos frecuentemente consultados tienen índices:
+```sql
+-- Búsquedas por email
+CREATE INDEX idx_users_email ON users(email);
+-- Filtros por categoría
+CREATE INDEX idx_products_category_id ON products(category_id);
+-- Consultas de pedidos
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+```
+
+### 🔄 Reiniciar Base de Datos
+
+Si necesitas empezar de cero:
+
+```bash
+# Opción 1: Eliminar y recrear
+dropdb virtualpet
+./scripts/setup/init-database.sh
+
+# Opción 2: Solo eliminar datos
+psql -U virtualpet_user -d virtualpet -c "
+  TRUNCATE user_management.users, user_management.roles CASCADE;
+  TRUNCATE product_catalog.categories, product_catalog.products CASCADE;
+  TRUNCATE cart.carts, cart.cart_items CASCADE;
+  TRUNCATE order_management.orders CASCADE;
+"
+# Luego re-ejecutar el script
+./scripts/setup/init-database.sh
+```
 
 ---
 

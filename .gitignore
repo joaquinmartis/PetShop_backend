@@ -98,6 +98,9 @@ application-secrets.properties
 src/main/resources/application-local.properties
 src/main/resources/application-dev.properties
 
+# Personal installation guide with sensitive data
+INSTALACION-PERSONAL.md
+
 # Logs
 logs/
 *.log.*

@@ -10,6 +10,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,9 +19,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = "*")  // Para desarrollo, en producción especificar el dominio
 @Tag(name = "User Management", description = "Gestión de usuarios, registro y autenticación")
 public class UserController {
 
@@ -78,13 +82,19 @@ public class UserController {
 
     @Operation(
             summary = "Iniciar sesión",
-            description = "Autentica al usuario y retorna un token JWT"
+            description = "Autentica al usuario y establece una cookie HttpOnly con el token JWT"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Login exitoso",
-                    content = @Content(schema = @Schema(implementation = LoginResponse.class))
+                    description = "Login exitoso - Cookie establecida",
+                    content = @Content(
+                            schema = @Schema(implementation = Map.class),
+                            examples = @ExampleObject(
+                                    name = "Success",
+                                    value = "{\"message\":\"Login exitoso\",\"user\":{\"id\":1,\"email\":\"user@example.com\",\"role\":\"CLIENT\"}}"
+                            )
+                    )
             ),
             @ApiResponse(
                     responseCode = "400",
@@ -121,9 +131,80 @@ public class UserController {
             )
     })
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = userService.login(request);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<Map<String, Object>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse response) {
+
+        LoginResponse loginResponse = userService.login(request);
+
+        // Crear cookie HttpOnly con el access token
+        Cookie accessTokenCookie = new Cookie("accessToken", loginResponse.getAccessToken());
+        accessTokenCookie.setHttpOnly(true);  // No accesible desde JavaScript
+        accessTokenCookie.setSecure(false);    // En producción cambiar a true (requiere HTTPS)
+        accessTokenCookie.setPath("/");
+        accessTokenCookie.setMaxAge(3600);     // 1 hora (en segundos)
+        accessTokenCookie.setAttribute("SameSite", "Lax"); // Protección contra CSRF
+
+        // Crear cookie HttpOnly con el refresh token
+        Cookie refreshTokenCookie = new Cookie("refreshToken", loginResponse.getRefreshToken());
+        refreshTokenCookie.setHttpOnly(true);
+        refreshTokenCookie.setSecure(false);   // En producción cambiar a true
+        refreshTokenCookie.setPath("/");
+        refreshTokenCookie.setMaxAge(3600);    // 1 hora (ajustar según necesites)
+        refreshTokenCookie.setAttribute("SameSite", "Lax");
+
+        // Agregar cookies a la respuesta
+        response.addCookie(accessTokenCookie);
+        response.addCookie(refreshTokenCookie);
+
+        // Retornar respuesta sin exponer los tokens en el body
+        Map<String, Object> responseBody = new HashMap<>();
+        responseBody.put("message", "Login exitoso");
+        responseBody.put("user", loginResponse.getUser());
+
+        return ResponseEntity.ok(responseBody);
+    }
+
+    @Operation(
+            summary = "Cerrar sesión",
+            description = "Elimina las cookies de autenticación"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Logout exitoso",
+                    content = @Content(
+                            schema = @Schema(implementation = Map.class),
+                            examples = @ExampleObject(
+                                    name = "Success",
+                                    value = "{\"message\":\"Logout exitoso\"}"
+                            )
+                    )
+            )
+    })
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(HttpServletResponse response) {
+        // Eliminar cookie de access token
+        Cookie accessTokenCookie = new Cookie("accessToken", null);
+        accessTokenCookie.setHttpOnly(true);
+        accessTokenCookie.setSecure(false);
+        accessTokenCookie.setPath("/");
+        accessTokenCookie.setMaxAge(0); // Eliminar inmediatamente
+
+        // Eliminar cookie de refresh token
+        Cookie refreshTokenCookie = new Cookie("refreshToken", null);
+        refreshTokenCookie.setHttpOnly(true);
+        refreshTokenCookie.setSecure(false);
+        refreshTokenCookie.setPath("/");
+        refreshTokenCookie.setMaxAge(0); // Eliminar inmediatamente
+
+        response.addCookie(accessTokenCookie);
+        response.addCookie(refreshTokenCookie);
+
+        Map<String, String> responseBody = new HashMap<>();
+        responseBody.put("message", "Logout exitoso");
+
+        return ResponseEntity.ok(responseBody);
     }
 
     @Operation(

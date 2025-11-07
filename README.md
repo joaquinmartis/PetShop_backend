@@ -26,7 +26,7 @@ API REST de e-commerce para productos de mascotas, construida con arquitectura m
 
 ## ✨ Características
 
-- ✅ **Autenticación JWT** - Sistema seguro de autenticación y autorización
+- ✅ **Autenticación JWT con HttpOnly Cookies** - Sistema seguro que protege contra XSS
 - ✅ **Roles de Usuario** - CLIENT y WAREHOUSE con permisos diferenciados
 - ✅ **Gestión de Productos** - Catálogo completo con categorías y búsqueda
 - ✅ **Carrito de Compras** - Sistema de carrito persistente
@@ -34,8 +34,8 @@ API REST de e-commerce para productos de mascotas, construida con arquitectura m
 - ✅ **Control de Stock** - Gestión automática de inventario
 - ✅ **Paginación y Filtros** - Consultas optimizadas con filtros avanzados
 - ✅ **Documentación Swagger** - API documentada con OpenAPI 3.0
+- ✅ **CORS Configurado** - Listo para trabajar con frontend en puerto 5173
 - ✅ **Manejo de Errores** - Respuestas de error estandarizadas
-- ✅ **Tests Automatizados** - Suite completa de testing (100+ tests)
 
 ---
 
@@ -690,16 +690,58 @@ cd docs/testing
 
 ## 🔒 Seguridad
 
+### 🍪 Autenticación con HttpOnly Cookies
+
+Este proyecto utiliza **HttpOnly Cookies** para almacenar tokens JWT de forma segura, protegiendo contra ataques XSS.
+
+#### ¿Por qué HttpOnly Cookies?
+
+| Aspecto | HttpOnly Cookies | localStorage |
+|---------|------------------|--------------|
+| **Seguridad XSS** | ✅ JavaScript no puede acceder | ❌ Vulnerable |
+| **Envío automático** | ✅ El navegador lo hace | ❌ Manual |
+| **Protección** | ✅ Mayor seguridad | ⚠️ Menor |
+
+#### Configuración del Frontend
+
+**Con Fetch API:**
+```javascript
+// ⚠️ IMPORTANTE: Incluir credentials: 'include'
+const response = await fetch('http://localhost:8080/api/users/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  credentials: 'include', // 🔑 CRÍTICO para cookies
+  body: JSON.stringify({ email, password })
+});
+```
+
+**Con Axios:**
+```javascript
+const api = axios.create({
+  baseURL: 'http://localhost:8080/api',
+  withCredentials: true // 🔑 CRÍTICO para cookies
+});
+```
+
+📚 **Documentación completa:** [docs/HTTPONLY-COOKIES.md](docs/HTTPONLY-COOKIES.md)
+
+#### Endpoints de Autenticación
+
+- **POST** `/api/users/login` - Establece cookies HttpOnly
+- **POST** `/api/users/logout` - Elimina las cookies
+- **GET** `/api/users/profile` - Usa cookies automáticamente
+
 ### Implementaciones de Seguridad
 
-- ✅ **Autenticación JWT** - Tokens firmados con HS512
+- ✅ **Autenticación JWT con HttpOnly Cookies** - Protección contra XSS
+- ✅ **CORS Configurado** - Permite cookies desde frontend (puerto 5173)
 - ✅ **Passwords Hasheados** - BCrypt con salt
 - ✅ **Autorización por Roles** - CLIENT y WAREHOUSE
 - ✅ **Validación de Tokens** - En cada request protegido
 - ✅ **Expiración de Tokens** - 1 hora por defecto
 - ✅ **Variables de Entorno** - Credenciales protegidas
 - ✅ **Validación de Entrada** - En todos los endpoints
-- ✅ **Protección CSRF** - Configurado en Spring Security
+- ✅ **SameSite Cookies** - Protección contra CSRF
 
 ### Configuración JWT
 

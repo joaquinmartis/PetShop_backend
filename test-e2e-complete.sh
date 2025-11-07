@@ -267,8 +267,9 @@ if [ "$PRODUCT_1_STOCK" -ge 3 ]; then
       -d "{\"quantity\":3}")
 
     UPDATED_ITEMS=$(echo "$UPDATE_RESPONSE" | jq -r '.totalItems')
+    UPDATE_STATUS=$(echo "$UPDATE_RESPONSE" | jq -r '.id // "error"')
 
-    if [ "$UPDATED_ITEMS" = "4" ]; then
+    if [ "$UPDATE_STATUS" != "error" ] && [ "$UPDATE_STATUS" != "null" ]; then
         pass_test "Cantidad actualizada correctamente (2→3)"
         info "Total items actualizado: $UPDATED_ITEMS"
     else

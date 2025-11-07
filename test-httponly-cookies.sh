@@ -107,14 +107,13 @@ echo ""
 
 # Test 5: Sin cookies (debe fallar)
 echo -e "${YELLOW}➤ TEST 5: Request SIN cookies (debe fallar)...${NC}"
-PROFILE_NO_COOKIE=$(curl -s http://localhost:8080/api/users/profile)
-STATUS=$(echo "$PROFILE_NO_COOKIE" | jq -r '.status // "200"')
+HTTP_CODE=$(curl -s -w "%{http_code}" -o /dev/null http://localhost:8080/api/users/profile)
 
-if [ "$STATUS" = "403" ] || [ "$STATUS" = "401" ]; then
-    echo -e "   ${GREEN}✅ Acceso correctamente bloqueado sin cookies${NC}"
+if [ "$HTTP_CODE" = "403" ] || [ "$HTTP_CODE" = "401" ]; then
+    echo -e "   ${GREEN}✅ Acceso correctamente bloqueado sin cookies (HTTP $HTTP_CODE)${NC}"
     ((PASSED++))
 else
-    echo -e "   ${RED}❌ Error: Acceso permitido sin cookies${NC}"
+    echo -e "   ${RED}❌ Error: Acceso permitido sin cookies (HTTP $HTTP_CODE)${NC}"
     ((FAILED++))
 fi
 echo ""
@@ -137,14 +136,13 @@ echo ""
 
 # Test 7: Request después del logout (debe fallar)
 echo -e "${YELLOW}➤ TEST 7: Request después del logout (debe fallar)...${NC}"
-PROFILE_AFTER_LOGOUT=$(curl -s -b /tmp/test-cookies.txt http://localhost:8080/api/users/profile)
-STATUS_AFTER=$(echo "$PROFILE_AFTER_LOGOUT" | jq -r '.status // "200"')
+HTTP_CODE_AFTER=$(curl -s -w "%{http_code}" -o /dev/null -b /tmp/test-cookies.txt http://localhost:8080/api/users/profile)
 
-if [ "$STATUS_AFTER" = "403" ] || [ "$STATUS_AFTER" = "401" ]; then
-    echo -e "   ${GREEN}✅ Acceso correctamente bloqueado después del logout${NC}"
+if [ "$HTTP_CODE_AFTER" = "403" ] || [ "$HTTP_CODE_AFTER" = "401" ]; then
+    echo -e "   ${GREEN}✅ Acceso correctamente bloqueado después del logout (HTTP $HTTP_CODE_AFTER)${NC}"
     ((PASSED++))
 else
-    echo -e "   ${RED}❌ Error: Acceso permitido después del logout${NC}"
+    echo -e "   ${RED}❌ Error: Acceso permitido después del logout (HTTP $HTTP_CODE_AFTER)${NC}"
     ((FAILED++))
 fi
 echo ""
@@ -154,7 +152,7 @@ echo "════════════════════════�
 echo "  📊 RESUMEN DE PRUEBAS"
 echo "════════════════════════════════════════════════════════"
 TOTAL=$((PASSED + FAILED))
-SUCCESS_RATE=$(echo "scale=2; $PASSED * 100 / $TOTAL" | bc)
+SUCCESS_RATE=$(awk "BEGIN {printf \"%.2f\", ($PASSED * 100 / $TOTAL)}")
 
 echo ""
 echo -e "Total de tests: ${TOTAL}"

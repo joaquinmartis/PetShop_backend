@@ -69,8 +69,8 @@ API REST de e-commerce para productos de mascotas, construida con arquitectura m
 
 #### 1️⃣ Clonar el repositorio
 ```bash
-git clone https://github.com/tu-usuario/virtual-pet.git
-cd VirtualPet
+git clone https://github.com/joaquinmartis/PetShop_backend.git
+cd PetShop_backend
 ```
 
 #### 2️⃣ Crear e inicializar base de datos PostgreSQL

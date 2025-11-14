@@ -1,0 +1,7 @@
+runtime: java17
+
+env_variables:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql:///virtualpet?cloudSqlInstance=petshop-476715:us-central1:db-1&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+  SPRING_DATASOURCE_USERNAME: "virtualpet_user"
+  SPRING_DATASOURCE_PASSWORD: "Virtualpet123!"
+

@@ -30,10 +30,10 @@ public class CookieUtil {
     public Cookie createAccessTokenCookie(String token) {
         Cookie cookie = new Cookie(ACCESS_TOKEN_COOKIE_NAME, token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(secure);
+        cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(maxAge);
-        cookie.setAttribute("SameSite", sameSite);
+        cookie.setAttribute("SameSite", "None");
         return cookie;
     }
 
@@ -43,10 +43,10 @@ public class CookieUtil {
     public Cookie createRefreshTokenCookie(String token) {
         Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(secure);
+        cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(maxAge);
-        cookie.setAttribute("SameSite", sameSite);
+        cookie.setAttribute("SameSite", "None");
         return cookie;
     }
 
@@ -56,7 +56,7 @@ public class CookieUtil {
     public Cookie deleteAccessTokenCookie() {
         Cookie cookie = new Cookie(ACCESS_TOKEN_COOKIE_NAME, null);
         cookie.setHttpOnly(true);
-        cookie.setSecure(secure);
+        cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(0);
         return cookie;
@@ -68,7 +68,7 @@ public class CookieUtil {
     public Cookie deleteRefreshTokenCookie() {
         Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE_NAME, null);
         cookie.setHttpOnly(true);
-        cookie.setSecure(secure);
+        cookie.setSecure(true);
         cookie.setPath("/");
         cookie.setMaxAge(0);
         return cookie;

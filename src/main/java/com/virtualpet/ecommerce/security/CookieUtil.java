@@ -12,10 +12,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class CookieUtil {
 
-    @Value("${cookie.secure:false}")
+    @Value("${cookie.secure:true}")
     private boolean secure;
 
-    @Value("${cookie.same-site:Lax}")
+    @Value("${cookie.same-site:None}")
     private String sameSite;
 
     @Value("${cookie.max-age:3600}")

@@ -196,6 +196,7 @@ public class UserController {
         accessTokenCookie.setSecure(secure);
         accessTokenCookie.setPath("/");
         accessTokenCookie.setMaxAge(0); // Eliminar inmediatamente
+        accessTokenCookie.setAttribute("SameSite", sameSite);
 
         // Eliminar cookie de refresh token
         Cookie refreshTokenCookie = new Cookie("refreshToken", null);
@@ -203,6 +204,7 @@ public class UserController {
         refreshTokenCookie.setSecure(secure);
         refreshTokenCookie.setPath("/");
         refreshTokenCookie.setMaxAge(0); // Eliminar inmediatamente
+        refreshTokenCookie.setAttribute("SameSite", sameSite);
 
         response.addCookie(accessTokenCookie);
         response.addCookie(refreshTokenCookie);

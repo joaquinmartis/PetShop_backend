@@ -14,6 +14,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -26,7 +27,11 @@ import java.util.Map;
 @RequestMapping("/api/users")
 @Tag(name = "User Management", description = "Gestión de usuarios, registro y autenticación")
 public class UserController {
+    @Value("${cookie.secure:true}")
+    private boolean secure;
 
+    @Value("${cookie.same-site:None}")
+    private String sameSite;
     @Autowired
     private UserService userService;
 
@@ -130,6 +135,7 @@ public class UserController {
                     )
             )
     })
+
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(
             @Valid @RequestBody LoginRequest request,
@@ -140,18 +146,18 @@ public class UserController {
         // Crear cookie HttpOnly con el access token
         Cookie accessTokenCookie = new Cookie("accessToken", loginResponse.getAccessToken());
         accessTokenCookie.setHttpOnly(true);  // No accesible desde JavaScript
-        accessTokenCookie.setSecure(false);    // En producción cambiar a true (requiere HTTPS)
+        accessTokenCookie.setSecure(secure);    // En producción cambiar a true (requiere HTTPS)
         accessTokenCookie.setPath("/");
         accessTokenCookie.setMaxAge(3600);     // 1 hora (en segundos)
-        accessTokenCookie.setAttribute("SameSite", "Lax"); // Protección contra CSRF
+        accessTokenCookie.setAttribute("SameSite", sameSite); // Protección contra CSRF
 
         // Crear cookie HttpOnly con el refresh token
         Cookie refreshTokenCookie = new Cookie("refreshToken", loginResponse.getRefreshToken());
         refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(false);   // En producción cambiar a true
+        refreshTokenCookie.setSecure(secure);   // En producción cambiar a true
         refreshTokenCookie.setPath("/");
         refreshTokenCookie.setMaxAge(3600);    // 1 hora (ajustar según necesites)
-        refreshTokenCookie.setAttribute("SameSite", "Lax");
+        refreshTokenCookie.setAttribute("SameSite", sameSite);
 
         // Agregar cookies a la respuesta
         response.addCookie(accessTokenCookie);
@@ -187,14 +193,14 @@ public class UserController {
         // Eliminar cookie de access token
         Cookie accessTokenCookie = new Cookie("accessToken", null);
         accessTokenCookie.setHttpOnly(true);
-        accessTokenCookie.setSecure(false);
+        accessTokenCookie.setSecure(secure);
         accessTokenCookie.setPath("/");
         accessTokenCookie.setMaxAge(0); // Eliminar inmediatamente
 
         // Eliminar cookie de refresh token
         Cookie refreshTokenCookie = new Cookie("refreshToken", null);
         refreshTokenCookie.setHttpOnly(true);
-        refreshTokenCookie.setSecure(false);
+        refreshTokenCookie.setSecure(secure);
         refreshTokenCookie.setPath("/");
         refreshTokenCookie.setMaxAge(0); // Eliminar inmediatamente
 

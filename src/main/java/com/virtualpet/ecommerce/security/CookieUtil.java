@@ -59,6 +59,7 @@ public class CookieUtil {
         cookie.setSecure(secure);
         cookie.setPath("/");
         cookie.setMaxAge(0);
+        cookie.setAttribute("SameSite", sameSite);
         return cookie;
     }
 
@@ -71,6 +72,7 @@ public class CookieUtil {
         cookie.setSecure(secure);
         cookie.setPath("/");
         cookie.setMaxAge(0);
+        cookie.setAttribute("SameSite", sameSite);
         return cookie;
     }
 

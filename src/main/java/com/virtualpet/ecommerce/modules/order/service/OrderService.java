@@ -98,6 +98,8 @@ public class OrderService {
         BigDecimal total = cart.getItems().stream()
                 .map(CartItem::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal shipping = new BigDecimal("10000");
+        total = total.add(shipping);
         order.setTotal(total);
 
         // 5. Crear los items del pedido (con snapshots del carrito)

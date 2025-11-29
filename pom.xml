@@ -95,6 +95,11 @@
           <artifactId>postgres-socket-factory</artifactId>
           <version>1.16.0</version>
         </dependency>
+		<!-- Email Notifications -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
 
 	</dependencies>
 

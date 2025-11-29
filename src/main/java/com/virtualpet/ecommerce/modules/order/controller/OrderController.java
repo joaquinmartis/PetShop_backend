@@ -193,5 +193,58 @@ public class OrderController {
         OrderResponse order = orderService.cancelOrder(userId, id, request);
         return ResponseEntity.ok(order);
     }
+
+    @Operation(
+            summary = "Cambiar estado de pedido a DELIVERED",
+            description = "Cambia el estado de un pedido a DELIVERED y dispara notificaciones al cliente. Requiere rol WAREHOUSE."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Estado cambiado exitosamente",
+                    content = @Content(schema = @Schema(implementation = OrderResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Estado inválido o transición no permitida",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "No autenticado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Sin permisos (requiere rol WAREHOUSE)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Pedido no encontrado",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Error interno del servidor",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            )
+    })
+    @PutMapping("/{id}/status")
+    public ResponseEntity<OrderResponse> updateOrderStatus(
+            @Parameter(description = "ID del pedido") @PathVariable Long id,
+            @RequestBody java.util.Map<String, String> statusRequest,
+            Authentication authentication) {
+        String email = authentication.getName();
+        Long warehouseUserId = userService.getProfile(email).getId();
+
+        String status = statusRequest.get("status");
+        if (status == null || !status.equals("DELIVERED")) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        OrderResponse order = orderService.markDeliveredDirect(id, warehouseUserId);
+        return ResponseEntity.ok(order);
+    }
 }
 

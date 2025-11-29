@@ -14,7 +14,9 @@ import com.virtualpet.ecommerce.modules.product.dto.StockItem;
 import com.virtualpet.ecommerce.modules.product.service.ProductService;
 import com.virtualpet.ecommerce.modules.user.dto.UserResponse;
 import com.virtualpet.ecommerce.modules.user.service.UserService;
+import com.virtualpet.ecommerce.modules.notification.service.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +29,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class OrderService {
 
     @Autowired
@@ -40,6 +43,9 @@ public class OrderService {
 
     @Autowired
     private ProductService productService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @Autowired
     private UserService userService;
@@ -287,6 +293,42 @@ public class OrderService {
             throw new IllegalArgumentException("Solo se pueden entregar pedidos despachados");
         }
 
+        // ⭐ NUEVO: Enviar notificaciones al cliente
+        try {
+            notificationService.notifyOrderDelivered(order);
+        } catch (Exception e) {
+            log.error("Error al enviar notificaciones para pedido {}: {}", orderId, e.getMessage());
+            // No lanzamos la excepción para no afectar el flujo principal
+            // El pedido se marca como DELIVERED de todas formas
+        }
+
+        Order.OrderStatus previousStatus = order.getStatus();
+        order.setStatus(Order.OrderStatus.DELIVERED);
+        order = orderRepository.save(order);
+
+        recordStatusChange(order, previousStatus, Order.OrderStatus.DELIVERED, warehouseUserId, Order.CancelledBy.WAREHOUSE, null);
+
+        return mapToOrderResponse(order);
+    }
+
+    /**
+     * Marcar pedido como entregado (sin restricción de estado previo)
+     * Para pruebas y administración flexible
+     */
+    @Transactional
+    public OrderResponse markDeliveredDirect(Long orderId, Long warehouseUserId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
+
+        // ⭐ Enviar notificaciones al cliente
+        try {
+            notificationService.notifyOrderDelivered(order);
+            log.info("Notificaciones enviadas exitosamente para pedido {}", orderId);
+        } catch (Exception e) {
+            log.error("Error al enviar notificaciones para pedido {}: {}", orderId, e.getMessage(), e);
+            // No lanzamos la excepción para no afectar el flujo principal
+        }
+
         Order.OrderStatus previousStatus = order.getStatus();
         order.setStatus(Order.OrderStatus.DELIVERED);
         order = orderRepository.save(order);
@@ -368,6 +410,14 @@ public class OrderService {
                 .map(this::mapToOrderItemResponse)
                 .collect(Collectors.toList());
 
+        // Obtener cantidad de notificaciones
+        int notificationCount = 0;
+        try {
+            notificationCount = notificationService.getNotificationsByOrderId(order.getId()).size();
+        } catch (Exception e) {
+            log.debug("No se pudieron cargar notificaciones para pedido {}", order.getId());
+        }
+
         return OrderResponse.builder()
                 .id(order.getId())
                 .userId(order.getUserId())
@@ -386,6 +436,8 @@ public class OrderService {
                 .items(itemResponses)
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
+                .hasNotifications(notificationCount > 0)
+                .notificationCount(notificationCount)
                 .build();
     }
 

@@ -32,5 +32,9 @@ public class OrderResponse {
     private List<OrderItemResponse> items;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Información de notificaciones (para backoffice)
+    private Boolean hasNotifications;  // Si se enviaron notificaciones
+    private Integer notificationCount; // Cantidad de notificaciones enviadas
 }
 

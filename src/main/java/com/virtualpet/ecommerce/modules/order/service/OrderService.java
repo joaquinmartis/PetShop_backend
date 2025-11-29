@@ -272,6 +272,16 @@ public class OrderService {
             throw new IllegalArgumentException("Solo se pueden despachar pedidos listos para enviar");
         }
 
+        // ⭐ Enviar notificaciones al cliente cuando se despacha el pedido
+        try {
+            notificationService.notifyOrderDelivered(order);
+            log.info("Notificaciones enviadas exitosamente para pedido {}", orderId);
+        } catch (Exception e) {
+            log.error("Error al enviar notificaciones para pedido {}: {}", orderId, e.getMessage());
+            // No lanzamos la excepción para no afectar el flujo principal
+            // El pedido se marca como SHIPPED de todas formas
+        }
+
         Order.OrderStatus previousStatus = order.getStatus();
         order.setStatus(Order.OrderStatus.SHIPPED);
         order = orderRepository.save(order);
@@ -293,14 +303,6 @@ public class OrderService {
             throw new IllegalArgumentException("Solo se pueden entregar pedidos despachados");
         }
 
-        // ⭐ NUEVO: Enviar notificaciones al cliente
-        try {
-            notificationService.notifyOrderDelivered(order);
-        } catch (Exception e) {
-            log.error("Error al enviar notificaciones para pedido {}: {}", orderId, e.getMessage());
-            // No lanzamos la excepción para no afectar el flujo principal
-            // El pedido se marca como DELIVERED de todas formas
-        }
 
         Order.OrderStatus previousStatus = order.getStatus();
         order.setStatus(Order.OrderStatus.DELIVERED);
@@ -320,14 +322,6 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("Pedido no encontrado"));
 
-        // ⭐ Enviar notificaciones al cliente
-        try {
-            notificationService.notifyOrderDelivered(order);
-            log.info("Notificaciones enviadas exitosamente para pedido {}", orderId);
-        } catch (Exception e) {
-            log.error("Error al enviar notificaciones para pedido {}: {}", orderId, e.getMessage(), e);
-            // No lanzamos la excepción para no afectar el flujo principal
-        }
 
         Order.OrderStatus previousStatus = order.getStatus();
         order.setStatus(Order.OrderStatus.DELIVERED);

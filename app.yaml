@@ -1,9 +1,16 @@
 runtime: java17
 
-
+automatic_scaling:
+  max_instances: 10
+  min_instances: 0
 
 env_variables:
-  SPRING_DATASOURCE_URL: "jdbc:postgresql:///virtualpet?cloudSqlInstance=petshop-476715:us-central1:db-1&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql:///virtualpet?cloudSqlInstance=petshop-cloud:southamerica-east1:db-1&socketFactory=com.google.cloud.sql.postgres.SocketFactory"
   SPRING_DATASOURCE_USERNAME: "virtualpet_user"
   SPRING_DATASOURCE_PASSWORD: "Virtualpet123!"
+  JWT_SECRET: "miClaveSecretaSuperSeguraDeAlMenos256BitsParaFirmarTokensJWT123456789"
+  JWT_EXPIRATION: "3600000"
+  CORS_ALLOWED_ORIGINS: "http://localhost:5173,http://127.0.0.1:5173,https://virtualpet-963fb.web.app"
+  COOKIE_SECURE: "true"
+  COOKIE_SAME_SITE: "None"
 

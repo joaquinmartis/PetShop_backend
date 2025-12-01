@@ -1,0 +1,84 @@
+workspace "Virtual Pet - C2 Container View" {
+
+    model {
+        // Personas
+        customer = person "Cliente" "Compra productos, realiza pagos y sigue sus pedidos."
+        warehouse = person "Empleado de Depósito" "Gestiona pedidos y actualiza el estado de envíos."
+
+        // Sistemas externos reemplazados
+        brevoEmailService = softwareSystem "Brevo Email" "Servicio externo de envío de correos electrónicos."
+        telegramBotApi = softwareSystem "Telegram Bot API" "Servicio externo de mensajería instantánea."
+
+        // Sistema principal y contenedores
+        virtualPet = softwareSystem "Virtual Pet System" "Plataforma ecommerce 100% digital para mascotas." {
+
+            // Contenedores
+            webApp = container "Frontend Web SPA" "Interfaz web que permite al cliente y al backoffice interactuar con el sistema." "HTML, CSS, JavaScript (React) - Deployado en Firebase" {
+                tags "Web Browser"
+            }
+
+            backendApi = container "Backend API" "Expone funcionalidad para operaciones de clientes y para personal backoffice." "Java Spring Boot - Deployado en GCP App Engine" {
+                tags "Application Server"
+            }
+
+            database = container "Base de Datos" "Almacena información de productos, pedidos, usuarios y transacciones." "GCP Cloud SQL - PostgreSQL" {
+                tags "Database"
+            }
+
+            // Relaciones desde personas
+            customer -> webApp "Usa la interfaz web para consultar productos, comprar y pagar"
+            warehouse -> webApp "Utiliza la interfaz web para gestionar pedidos"
+
+            // Relaciones internas
+            webApp -> backendApi "Consume API REST" "HTTPS/JSON"
+            backendApi -> database "Lee y escribe datos" "PostgreSQL protocol/TLS"
+
+            // Relaciones externas (actualizadas)
+            backendApi -> brevoEmailService "Envía emails de notificación" "SMTP/TLS"
+            backendApi -> telegramBotApi "Envía mensajes automáticos por Telegram" "HTTPS/JSON"
+        }
+    }
+
+    views {
+        container virtualPet "VirtualPet-C2" {
+            include *
+            autolayout lr
+            title "C2 - Vista de Contenedores: Virtual Pet"
+            description "Muestra los principales contenedores de Virtual Pet y cómo se comunican entre sí y con sistemas externos de notificación."
+        }
+
+        styles {
+            element "Web Browser" {
+                shape WebBrowser
+                background "#1976D2"
+                color "#FFFFFF"
+            }
+
+            element "Application Server" {
+                shape Hexagon
+                background "#7B1FA2"
+                color "#FFFFFF"
+            }
+
+            element "Database" {
+                shape Cylinder
+                background "#388E3C"
+                color "#FFFFFF"
+            }
+
+            element "Person" {
+                shape Person
+                background "#FBC02D"
+                color "#000000"
+            }
+
+            element "Software System" {
+                shape RoundedBox
+                background "#FFA000"
+                color "#000000"
+            }
+        }
+
+        theme default
+    }
+}

@@ -1,15 +1,18 @@
-workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes corregida de la API Application" {
+workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes completa de la API Application incluyendo módulo de Notification" {
 
     model {
         # Actores
-        cliente = person "Cliente" "Usuario que compra productos para mascotas"
-        empleadoAlmacen = person "Empleado de Almacén" "Personal de warehouse"
+        frontendWebApp = softwareSystem "Frontend Web SPA" "Interfaz web para clientes y empleados del backoffice" "React"
+
+        # Sistemas externos de notificación
+        brevoEmailSystem = softwareSystem "Brevo Email Service" "Servicio externo de envío de correos electrónicos vía SMTP" "External System"
+        telegramBotSystem = softwareSystem "Telegram Bot API" "API externa de Telegram para envío de mensajes instantáneos" "External System"
 
         # Sistema principal
         virtualPetSystem = softwareSystem "Virtual Pet E-Commerce" {
 
             # Base de datos
-            database = container "PostgreSQL Database" "Almacena usuarios, productos, carritos y pedidos" "PostgreSQL 14" "Database"
+            database = container "PostgreSQL Database" "Almacena usuarios, productos, carritos, pedidos y notificaciones" "PostgreSQL 14" "Database"
 
             # API Application
             apiApplication = container "API Application" "API REST de e-commerce" "Spring Boot 3.5.7" {
@@ -48,8 +51,8 @@ workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes correg
 
                 cartController = component "Cart Controller" "GET /api/cart, POST /api/cart/items, PATCH /api/cart/items/{id}, DELETE /api/cart/items/{id}" "Spring REST Controller" "Controller"
                 cartService = component "Cart Service" "addToCart(), updateCartItem(), getCartEntity() [API], clearCartAfterOrder() [API]" "Spring Service" "Service"
-                cartRepository = component "Cart Repository" "Acceso a datos de carritos en cart.carts" "Spring Data JPA Repository" "Repository"
-                cartItemRepository = component "Cart Item Repository" "Acceso a datos de items en cart.cart_items" "Spring Data JPA Repository" "Repository"
+                cartRepository = component "Cart Repository" "Acceso a datos de carritos en shopping_cart.carts" "Spring Data JPA Repository" "Repository"
+                cartItemRepository = component "Cart Item Repository" "Acceso a datos de items en shopping_cart.cart_items" "Spring Data JPA Repository" "Repository"
 
                 # ==========================================
                 # ORDER MANAGEMENT MODULE
@@ -62,41 +65,45 @@ workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes correg
                 orderStatusHistoryRepository = component "Order Status History Repository" "Acceso a historial en order_management.order_status_history" "Spring Data JPA Repository" "Repository"
 
                 # ==========================================
+                # NOTIFICATION MODULE
+                # ==========================================
+
+                notificationController = component "Notification Preference Controller" "POST /api/notifications/preferences, GET /api/notifications/preferences, PUT /api/notifications/preferences, GET /api/notifications/preferences/status" "Spring REST Controller" "Controller"
+                backofficeNotificationController = component "Backoffice Notification Controller" "GET /api/backoffice/notifications/orders/{orderId}" "Spring REST Controller" "Controller"
+
+                notificationService = component "Notification Service" "createPreferences(), updatePreferences(), getMyPreferences(), notifyOrderDelivered() [API Pública], getNotificationsByOrderId() [API Pública]" "Spring Service" "Service"
+                emailNotificationService = component "Email Notification Service" "sendDeliveryNotification() - Integración con Brevo vía SMTP" "Spring Service" "Service"
+                whatsappNotificationService = component "WhatsApp Notification Service" "generateWhatsAppLink() - Genera links de WhatsApp Web" "Spring Service" "Service"
+                smsNotificationService = component "SMS Notification Service" "sendSMS() - Simulación de envío SMS" "Spring Service" "Service"
+                telegramNotificationService = component "Telegram Notification Service" "sendMessage() - Integración con Telegram Bot API" "Spring Service" "Service"
+
+                notificationPreferenceRepository = component "Notification Preference Repository" "Acceso a preferencias en notification_management.notification_preferences" "Spring Data JPA Repository" "Repository"
+                notificationLogRepository = component "Notification Log Repository" "Acceso a logs en notification_management.notification_logs" "Spring Data JPA Repository" "Repository"
+
+                # ==========================================
                 # RELACIONES - SECURITY
                 # ==========================================
 
-                # JWT Filter usa JWT Util para validar tokens
                 jwtAuthFilter -> jwtUtil "Valida tokens JWT usando"
-
-                # JWT Filter usa UserDetailsService para cargar usuarios
                 jwtAuthFilter -> userDetailsService "Carga usuario autenticado desde"
-
-                # UserDetailsService consulta usuarios en BD
                 userDetailsService -> userRepository "Lee usuarios desde"
+                frontendWebApp -> securityConfig "Requests pasan por seguridad"
 
                 # ==========================================
                 # RELACIONES - USER MANAGEMENT
                 # ==========================================
 
-                # Controller → Service (capa de presentación a lógica)
                 userController -> userService "Delega lógica de negocio a"
-
-                # Service → Repositories (lógica a datos)
                 userService -> userRepository "Lee/escribe usuarios en"
                 userService -> roleRepository "Consulta roles desde"
-
-                # Service genera tokens JWT
                 userService -> jwtUtil "Genera tokens JWT usando"
 
                 # ==========================================
                 # RELACIONES - PRODUCT CATALOG
                 # ==========================================
 
-                # Controllers → Service
                 productController -> productService "Delega lógica a"
                 categoryController -> productService "Delega lógica a"
-
-                # Service → Repositories
                 productService -> productRepository "Lee/escribe productos en"
                 productService -> categoryRepository "Consulta categorías desde"
 
@@ -104,39 +111,63 @@ workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes correg
                 # RELACIONES - CART (Usa User y Product)
                 # ==========================================
 
-                # Controller necesita saber quién es el usuario autenticado
                 cartController -> userService "Obtiene userId desde email autenticado"
-
-                # Controller → Service
                 cartController -> cartService "Delega lógica a"
-
-                # CartService usa ProductService (API PÚBLICA inter-módulo)
                 cartService -> productService "Valida producto existe y tiene stock [API Pública]"
-
-                # Service → Repositories
                 cartService -> cartRepository "Lee/escribe carritos en"
                 cartService -> cartItemRepository "Gestiona items en"
 
                 # ==========================================
-                # RELACIONES - ORDER (Usa User, Cart y Product)
+                # RELACIONES - ORDER (Usa User, Cart, Product y Notification)
                 # ==========================================
 
-                # Controllers necesitan userId
                 orderController -> userService "Obtiene userId del cliente autenticado"
                 backofficeOrderController -> userService "Obtiene userId del empleado warehouse"
-
-                # Controllers → Service
                 orderController -> orderService "Delega lógica a"
                 backofficeOrderController -> orderService "Delega lógica a"
 
-                # OrderService es el ORQUESTADOR - usa 3 módulos
+                # OrderService es el ORQUESTADOR - usa 4 módulos
                 orderService -> userService "Obtiene información completa del cliente [API Pública]"
                 orderService -> cartService "Obtiene items del carrito y lo vacía después [API Pública]"
                 orderService -> productService "Valida stock, reduce y restaura [API Pública]"
+                orderService -> notificationService "Envía notificación cuando pedido se marca como SHIPPED [API Pública]"
 
-                # Service → Repositories
                 orderService -> orderRepository "Lee/escribe pedidos en"
                 orderService -> orderStatusHistoryRepository "Registra cambios de estado en"
+
+                # ==========================================
+                # RELACIONES - NOTIFICATION (Usa User y Order)
+                # ==========================================
+
+                # Controllers → NotificationService
+                notificationController -> userService "Obtiene userId del usuario autenticado"
+                notificationController -> notificationService "Delega lógica de preferencias a"
+                backofficeNotificationController -> notificationService "Consulta logs de notificaciones"
+
+                # NotificationService coordina los servicios específicos de canal
+                notificationService -> userService "Obtiene datos completos del usuario (nombre, email, etc.) [API Pública]"
+                notificationService -> emailNotificationService "Envía email si está habilitado"
+                notificationService -> whatsappNotificationService "Genera link de WhatsApp si está habilitado"
+                notificationService -> smsNotificationService "Simula envío SMS si está habilitado"
+                notificationService -> telegramNotificationService "Envía mensaje Telegram si está habilitado"
+
+                # NotificationService → Repositories
+                # ES EL ÚNICO que accede a los repositories (no los servicios de canal)
+                notificationService -> notificationPreferenceRepository "Lee/escribe preferencias en"
+                notificationService -> notificationLogRepository "Guarda logs de TODOS los canales: email, whatsapp (link), telegram, SMS"
+
+                # Servicios de canal específico → Sistemas externos
+                # NO acceden a repositories, solo hacen el envío/generación
+                emailNotificationService -> brevoEmailSystem "Envía emails vía SMTP/TLS"
+                telegramNotificationService -> telegramBotSystem "Envía mensajes vía HTTPS/JSON"
+
+                # ==========================================
+                # RELACIONES DE SEGURIDAD
+                # ==========================================
+
+                securityConfig -> jwtAuthFilter "Registra filtro JWT en la cadena de seguridad"
+                securityConfig -> userDetailsService "Registra servicio de usuarios para autenticación"
+                securityConfig -> jwtUtil "Configura utilidades JWT"
 
                 # ==========================================
                 # RELACIONES CON BASE DE DATOS
@@ -150,16 +181,20 @@ workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes correg
                 cartItemRepository -> database "JDBC/JPA"
                 orderRepository -> database "JDBC/JPA"
                 orderStatusHistoryRepository -> database "JDBC/JPA"
+                notificationPreferenceRepository -> database "JDBC/JPA"
+                notificationLogRepository -> database "JDBC/JPA"
             }
         }
 
         # Relaciones externas
-        cliente -> userController "Registra, login, perfil"
-        cliente -> productController "Lista productos"
-        cliente -> categoryController "Lista categorías"
-        cliente -> cartController "Gestiona carrito"
-        cliente -> orderController "Crea y consulta pedidos"
-        empleadoAlmacen -> backofficeOrderController "Gestiona pedidos warehouse"
+        frontendWebApp -> userController "Registra usuarios, login, perfil"
+        frontendWebApp -> productController "Consulta productos"
+        frontendWebApp -> categoryController "Consulta categorías"
+        frontendWebApp -> cartController "Gestiona carrito"
+        frontendWebApp -> orderController "Gestiona pedidos del cliente"
+        frontendWebApp -> backofficeOrderController "Gestión de pedidos del warehouse"
+        frontendWebApp -> notificationController "Gestiona preferencias de notificación (cliente)"
+        frontendWebApp -> backofficeNotificationController "Consulta logs de notificaciones (backoffice)"
     }
 
     views {
@@ -171,64 +206,35 @@ workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes correg
         component apiApplication "Components-All" {
             include *
             autoLayout lr
-            description "Vista completa de componentes de la API - Arquitectura en capas con comunicación inter-módulos"
+            title "C3 - Vista de Componentes: Virtual Pet E-Commerce API"
+            description "Arquitectura completa en capas con 5 módulos (User, Product, Cart, Order, Notification) y comunicación con sistemas externos"
         }
 
         # ==========================================
-        # VISTAS FILTRADAS POR MÓDULO
+        # VISTA FILTRADA: SOLO NOTIFICATION MODULE
         # ==========================================
 
-        component apiApplication "Components-UserManagement" {
-            include userController userService userRepository roleRepository
-            include jwtAuthFilter jwtUtil userDetailsService securityConfig
-            include cliente database
-            autoLayout tb
-            description "Módulo User Management: Autenticación, registro y perfiles"
-        }
-
-        component apiApplication "Components-ProductCatalog" {
-            include productController categoryController productService
-            include productRepository categoryRepository
-            include cliente database
-            autoLayout tb
-            description "Módulo Product Catalog: Productos y categorías"
-        }
-
-        component apiApplication "Components-Cart" {
-            include cartController cartService cartRepository cartItemRepository
-            include userService productService
-            include cliente database
-            autoLayout tb
-            description "Módulo Cart: Usa User (userId) y Product (validación stock)"
-        }
-
-        component apiApplication "Components-OrderManagement" {
-            include orderController backofficeOrderController orderService
-            include orderRepository orderStatusHistoryRepository
-            include userService cartService productService
-            include cliente empleadoAlmacen database
-            autoLayout tb
-            description "Módulo Order: Orquestador que usa User, Cart y Product"
-        }
-
-        component apiApplication "Components-Security" {
-            include securityConfig jwtAuthFilter jwtUtil userDetailsService
-            include userRepository database
-            autoLayout tb
-            description "Componentes de seguridad: JWT y Spring Security"
-        }
-
-        # ==========================================
-        # VISTA DE FLUJO: CREAR PEDIDO
-        # ==========================================
-
-        component apiApplication "Components-CreateOrderFlow" {
-            include cliente orderController orderService
-            include userService cartService productService
-            include orderRepository cartRepository productRepository
+        component apiApplication "Components-Notification-Focus" {
+            include element.tag==Controller
+            include element.tag==Service
+            include element.tag==Repository
+            include notificationController
+            include backofficeNotificationController
+            include notificationService
+            include emailNotificationService
+            include whatsappNotificationService
+            include smsNotificationService
+            include telegramNotificationService
+            include notificationPreferenceRepository
+            include notificationLogRepository
+            include userService
+            include orderService
             include database
-            autoLayout lr
-            description "Flujo completo: Cliente → Order → User + Cart + Product"
+            include brevoEmailSystem
+            include telegramBotSystem
+            autoLayout tb
+            title "C3 - Vista Filtrada: Módulo de Notification"
+            description "Detalle del módulo de notificación multicanal. NotificationService coordina el envío por todos los canales y guarda logs en BD (email, whatsapp link, telegram, sms). Los servicios de canal NO acceden a BD directamente."
         }
 
         # ==========================================
@@ -244,6 +250,11 @@ workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes correg
             element "Software System" {
                 background #1168bd
                 color #ffffff
+            }
+            element "External System" {
+                background #999999
+                color #ffffff
+                shape RoundedBox
             }
             element "Container" {
                 background #438dd5
@@ -278,9 +289,8 @@ workspace "Virtual Pet E-Commerce - Component View" "Vista de componentes correg
                 routing direct
                 thickness 2
                 color #707070
-                fontSize 20
+                fontSize 14
             }
         }
     }
 }
-

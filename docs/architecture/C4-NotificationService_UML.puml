@@ -1,0 +1,276 @@
+@startuml NotificationService_Class_Diagram
+
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam classFontStyle bold
+
+' ===============================================
+' CLASE PRINCIPAL: NotificationService
+' ===============================================
+
+class NotificationService <<@Service>> {
+    ' DEPENDENCIAS (INYECTADAS)
+    - preferenceRepository: NotificationPreferenceRepository
+    - logRepository: NotificationLogRepository
+    - userService: UserService
+    - emailService: EmailNotificationService
+    - whatsappService: WhatsappNotificationService
+    - smsService: SmsNotificationService
+    - telegramService: TelegramNotificationService
+
+    ' MÉTODOS PÚBLICOS - GESTIÓN DE PREFERENCIAS
+    + createDefaultPreferences(userId: Long): NotificationPreferenceResponse
+    + createPreferences(userId: Long, request: NotificationPreferenceRequest): NotificationPreferenceResponse
+    + getMyPreferences(userId: Long): NotificationPreferenceResponse
+    + updatePreferences(userId: Long, request: NotificationPreferenceRequest): NotificationPreferenceResponse
+
+    ' MÉTODOS PÚBLICOS - ENVÍO DE NOTIFICACIONES
+    + notifyOrderDelivered(order: Order): void
+
+    ' MÉTODOS PÚBLICOS - CONSULTA DE LOGS (BACKOFFICE)
+    + getNotificationsByOrderId(orderId: Long): List<NotificationLogResponse>
+
+    ' MÉTODOS PRIVADOS - ENVÍO POR CANAL
+    - sendEmailNotification(order: Order, user: UserResponse, message: String): void
+    - sendWhatsappNotification(order: Order, user: UserResponse, message: String): void
+    - sendSmsNotification(order: Order, user: UserResponse, message: String): void
+    - sendTelegramNotification(order: Order, user: UserResponse, telegramChatId: String, message: String): void
+
+    ' MÉTODOS PRIVADOS - HELPERS
+    - buildDeliveryMessage(customerName: String, address: String, orderId: Long): String
+    - mapToResponse(preference: NotificationPreference): NotificationPreferenceResponse
+    - mapLogToResponse(log: NotificationLog): NotificationLogResponse
+}
+
+' ===============================================
+' CLASES RELACIONADAS - REPOSITORIES
+' ===============================================
+
+interface NotificationPreferenceRepository <<@Repository>> {
+    + findByUserId(userId: Long): Optional<NotificationPreference>
+    + existsByUserId(userId: Long): boolean
+    + save(preference: NotificationPreference): NotificationPreference
+}
+
+interface NotificationLogRepository <<@Repository>> {
+    + findByOrderId(orderId: Long): List<NotificationLog>
+    + save(log: NotificationLog): NotificationLog
+}
+
+' ===============================================
+' CLASES RELACIONADAS - SERVICES
+' ===============================================
+
+class UserService <<@Service>> {
+    + getUserById(userId: Long): UserResponse
+}
+
+class EmailNotificationService <<@Service>> {
+    + sendDeliveryNotification(toEmail: String, customerName: String, orderId: Long, shippingAddress: String): void
+}
+
+class WhatsappNotificationService <<@Service>> {
+    + generateWhatsappLink(phoneNumber: String, message: String): String
+}
+
+class SmsNotificationService <<@Service>> {
+    + sendSms(phoneNumber: String, message: String): void
+}
+
+class TelegramNotificationService <<@Service>> {
+    + sendMessage(chatId: String, message: String): void
+}
+
+' ===============================================
+' CLASES RELACIONADAS - ENTITIES
+' ===============================================
+
+class NotificationPreference <<@Entity>> {
+    - id: Long
+    - userId: Long
+    - emailEnabled: Boolean
+    - whatsappEnabled: Boolean
+    - whatsappNumber: String
+    - smsEnabled: Boolean
+    - smsNumber: String
+    - telegramEnabled: Boolean
+    - telegramChatId: String
+    - createdAt: LocalDateTime
+    - updatedAt: LocalDateTime
+}
+
+class NotificationLog <<@Entity>> {
+    - id: Long
+    - userId: Long
+    - orderId: Long
+    - channel: NotificationChannel
+    - status: NotificationStatus
+    - message: String
+    - errorDetail: String
+    - recipient: String
+    - sentAt: LocalDateTime
+}
+
+enum NotificationChannel {
+    EMAIL
+    WHATSAPP
+    TELEGRAM
+    SMS
+}
+
+enum NotificationStatus {
+    SENT
+    FAILED
+}
+
+' ===============================================
+' CLASES RELACIONADAS - DTOs
+' ===============================================
+
+class NotificationPreferenceRequest <<DTO>> {
+    - emailEnabled: Boolean
+    - whatsappEnabled: Boolean
+    - whatsappNumber: String
+    - smsEnabled: Boolean
+    - smsNumber: String
+    - telegramEnabled: Boolean
+    - telegramChatId: String
+}
+
+class NotificationPreferenceResponse <<DTO>> {
+    - id: Long
+    - userId: Long
+    - emailEnabled: Boolean
+    - whatsappEnabled: Boolean
+    - whatsappNumber: String
+    - smsEnabled: Boolean
+    - smsNumber: String
+    - telegramEnabled: Boolean
+    - telegramChatId: String
+    - createdAt: LocalDateTime
+    - updatedAt: LocalDateTime
+}
+
+class NotificationLogResponse <<DTO>> {
+    - id: Long
+    - channel: String
+    - status: String
+    - message: String
+    - errorDetail: String
+    - recipient: String
+    - sentAt: LocalDateTime
+    - whatsappLink: String
+}
+
+class UserResponse <<DTO>> {
+    - id: Long
+    - firstName: String
+    - email: String
+    - phone: String
+}
+
+class Order <<@Entity>> {
+    - id: Long
+    - userId: Long
+    - shippingAddress: String
+    - status: OrderStatus
+}
+
+' ===============================================
+' RELACIONES - DEPENDENCIAS
+' ===============================================
+
+NotificationService --> NotificationPreferenceRepository : usa
+NotificationService --> NotificationLogRepository : usa
+NotificationService --> UserService : usa
+NotificationService --> EmailNotificationService : usa
+NotificationService --> WhatsappNotificationService : usa
+NotificationService --> SmsNotificationService : usa
+NotificationService --> TelegramNotificationService : usa
+
+' ===============================================
+' RELACIONES - ENTIDADES Y DTOs
+' ===============================================
+
+NotificationService ..> NotificationPreference : lee/escribe
+NotificationService ..> NotificationLog : escribe
+NotificationService ..> Order : recibe
+NotificationService ..> UserResponse : recibe
+NotificationService ..> NotificationPreferenceRequest : recibe
+NotificationService ..> NotificationPreferenceResponse : retorna
+NotificationService ..> NotificationLogResponse : retorna
+
+NotificationLog *-- NotificationChannel
+NotificationLog *-- NotificationStatus
+
+NotificationPreferenceRepository ..> NotificationPreference : gestiona
+NotificationLogRepository ..> NotificationLog : gestiona
+
+' ===============================================
+' NOTAS ADICIONALES
+' ===============================================
+
+note right of NotificationService::notifyOrderDelivered
+    **Método API Público**
+    Llamado desde OrderService.markShipped()
+    Trigger: Cuando pedido pasa a SHIPPED
+
+    **Flujo:**
+    1. Obtiene datos del usuario (UserService)
+    2. Construye mensaje de notificación
+    3. Verifica preferencias del usuario
+    4. Envía por canales activos
+    5. Guarda logs en BD
+end note
+
+note bottom of NotificationService
+    **Arquitectura:**
+    - Es el ORQUESTADOR del módulo
+    - ÚNICO que accede a Repositories
+    - Coordina los 4 servicios de canal
+    - Guarda logs de TODOS los canales
+
+    **Anotación:** @Service, @Slf4j, @Transactional
+end note
+
+note left of NotificationPreferenceRepository
+    **Extiende:** JpaRepository
+    **Schema BD:** notification_management
+    **Tabla:** notification_preferences
+end note
+
+note left of NotificationLogRepository
+    **Extiende:** JpaRepository
+    **Schema BD:** notification_management
+    **Tabla:** notification_logs
+end note
+
+note bottom of EmailNotificationService
+    **Integración Externa:**
+    Brevo Email Service
+    Protocolo: SMTP/TLS
+    Puerto: 587
+end note
+
+note bottom of TelegramNotificationService
+    **Integración Externa:**
+    Telegram Bot API
+    Protocolo: HTTPS/JSON
+    URL: api.telegram.org
+end note
+
+note bottom of WhatsappNotificationService
+    **NO hay integración API**
+    Solo genera link:
+    https://wa.me/{phone}?text={msg}
+end note
+
+note bottom of SmsNotificationService
+    **SIMULADO**
+    No hay integración real
+    Solo logs
+end note
+
+@enduml
+

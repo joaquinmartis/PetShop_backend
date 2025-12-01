@@ -21,6 +21,11 @@ public class OpenApiConfig {
 
     @Bean
     public OpenAPI virtualPetOpenAPI() {
+        // Definir servidor de producción
+        Server productionServer = new Server();
+        productionServer.setUrl("https://petshop-cloud.rj.r.appspot.com");
+        productionServer.setDescription("Servidor de producción (GCP App Engine)");
+
         // Definir servidor local
         Server localServer = new Server();
         localServer.setUrl("http://localhost:8080");
@@ -59,7 +64,7 @@ public class OpenApiConfig {
         // NO aplicar seguridad global, se aplica por controlador/endpoint con @SecurityRequirement
         return new OpenAPI()
                 .info(info)
-                .servers(List.of(localServer))
+                .servers(List.of(productionServer, localServer))
                 .components(new Components()
                         .addSecuritySchemes("Bearer Authentication", securityScheme));
     }

@@ -85,15 +85,18 @@ Thumbs.db
 *.html
 *.xml
 
-# Environment variables
+# Environment variables (ignora archivos reales, NO los .example)
 .env
 .env.local
 .env.production
-.env.*
+.env.development
+!.env.example
 
-# Application properties with sensitive data
+# Application properties with sensitive data (ignora archivos reales, NO los .example)
 application-dev.properties
 application-secrets.properties
+application.properties
+!application.properties.example
 
 
 # Personal installation guide with sensitive data

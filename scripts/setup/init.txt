@@ -1,0 +1,453 @@
+-- virtualpet.init.sql
+-- Archivo de inicialización SQL Estándar.
+-- Contiene la estructura de la base de datos 'virtualpet' (Esquemas, Tablas, Claves, Índices y Funciones).
+
+-----------------------------------
+-- 1. ESQUEMAS (Schemas)
+-----------------------------------
+
+-- Crear esquemas (si la BDD lo soporta, si no, las tablas se crean directamente en el esquema principal)
+-- En SQL estándar, a veces se usan como prefijos de tabla: 'esquema.tabla'.
+
+CREATE SCHEMA IF NOT EXISTS user_management;
+CREATE SCHEMA IF NOT EXISTS product_catalog;
+CREATE SCHEMA IF NOT EXISTS cart;
+CREATE SCHEMA IF NOT EXISTS order_management;
+CREATE SCHEMA IF NOT EXISTS notification_management;
+
+---
+
+-----------------------------------
+-- 2. FUNCIONES / PROCEDIMIENTOS (Simplificados/Adaptados)
+-----------------------------------
+
+-- En SQL estándar no hay un 'UPDATE_UPDATED_AT' trigger tan universal como en Postgres.
+-- Se define una función genérica que debería ser adaptada al lenguaje procedural específico
+-- de la BDD de destino (ej: PL/SQL para Oracle, T-SQL para SQL Server, etc.).
+-- **NOTA:** Estas definiciones son *declarativas* y requieren ser implementadas o adaptadas.
+
+-- Función para actualizar el campo 'updated_at' (Implementación variará por BDD)
+-- CREATE FUNCTION update_updated_at_column()
+RETURNS TIMESTAMP
+BEGIN
+    RETURN CURRENT_TIMESTAMP;
+END;
+
+-- Función específica para actualizar el timestamp del carrito (Implementación variará por BDD)
+CREATE FUNCTION update_cart_timestamp(cart_id_param BIGINT)
+RETURNS VOID
+BEGIN
+    UPDATE cart.carts
+    SET updated_at = CURRENT_TIMESTAMP
+    WHERE id = cart_id_param;
+END;
+
+---
+
+-----------------------------------
+-- 3. TABLAS Y SECUENCIAS (Tablas, Claves Primarias y Restricciones)
+-----------------------------------
+
+-- user_management
+CREATE TABLE user_management.roles (
+    id INT NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT roles_pkey PRIMARY KEY (id),
+    CONSTRAINT roles_name_key UNIQUE (name)
+);
+
+CREATE SEQUENCE user_management.roles_id_seq START WITH 1 INCREMENT BY 1;
+-- ALTER TABLE user_management.roles ALTER COLUMN id SET DEFAULT NEXT VALUE FOR user_management.roles_id_seq; -- Sintaxis adaptable
+
+
+CREATE TABLE user_management.users (
+    id INT NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    password_hash TEXT NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    address TEXT NOT NULL,
+    role_id INT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT users_pkey PRIMARY KEY (id),
+    CONSTRAINT users_email_key UNIQUE (email),
+    CONSTRAINT users_role_id_fkey FOREIGN KEY (role_id) REFERENCES user_management.roles(id)
+);
+
+CREATE SEQUENCE user_management.users_id_seq START WITH 1 INCREMENT BY 1;
+-- ALTER TABLE user_management.users ALTER COLUMN id SET DEFAULT NEXT VALUE FOR user_management.users_id_seq;
+
+
+-- product_catalog
+CREATE TABLE product_catalog.categories (
+    id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT categories_pkey PRIMARY KEY (id),
+    CONSTRAINT categories_name_key UNIQUE (name)
+);
+
+CREATE SEQUENCE product_catalog.categories_id_seq START WITH 1 INCREMENT BY 1;
+
+
+CREATE TABLE product_catalog.products (
+    id INT NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description TEXT,
+    price NUMERIC(10,2) NOT NULL,
+    stock INT DEFAULT 0 NOT NULL,
+    category_id INT NOT NULL,
+    image_url VARCHAR(255),
+    active BOOLEAN DEFAULT TRUE NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT products_pkey PRIMARY KEY (id),
+    CONSTRAINT products_price_check CHECK (price >= 0),
+    CONSTRAINT products_stock_check CHECK (stock >= 0),
+    CONSTRAINT products_category_id_fkey FOREIGN KEY (category_id) REFERENCES product_catalog.categories(id)
+);
+
+CREATE SEQUENCE product_catalog.products_id_seq START WITH 1 INCREMENT BY 1;
+
+
+-- cart
+CREATE TABLE cart.carts (
+    id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT carts_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_user_cart UNIQUE (user_id)
+    -- FOREIGN KEY a user_management.users se omite por la arquitectura modular
+);
+
+CREATE SEQUENCE cart.carts_id_seq START WITH 1 INCREMENT BY 1;
+
+
+CREATE TABLE cart.cart_items (
+    id BIGINT NOT NULL,
+    cart_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price_snapshot NUMERIC(10,2) NOT NULL,
+    product_name_snapshot VARCHAR(150) NOT NULL,
+    added_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT cart_items_pkey PRIMARY KEY (id),
+    CONSTRAINT unique_cart_product UNIQUE (cart_id, product_id),
+    CONSTRAINT cart_items_quantity_check CHECK (quantity > 0),
+    CONSTRAINT cart_items_unit_price_snapshot_check CHECK (unit_price_snapshot >= 0),
+    CONSTRAINT cart_items_cart_id_fkey FOREIGN KEY (cart_id) REFERENCES cart.carts(id) ON DELETE CASCADE
+    -- FOREIGN KEY a product_catalog.products se omite por la arquitectura modular
+);
+
+CREATE SEQUENCE cart.cart_items_id_seq START WITH 1 INCREMENT BY 1;
+
+
+-- order_management
+CREATE TABLE order_management.orders (
+    id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    total NUMERIC(10,2) NOT NULL,
+    shipping_method VARCHAR(20),
+    shipping_id BIGINT,
+    shipping_address TEXT NOT NULL,
+    customer_name VARCHAR(200) NOT NULL,
+    customer_email VARCHAR(100),
+    customer_phone VARCHAR(20),
+    notes TEXT,
+    cancellation_reason VARCHAR(200),
+    cancelled_at TIMESTAMP WITHOUT TIME ZONE,
+    cancelled_by VARCHAR(20),
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT orders_pkey PRIMARY KEY (id),
+    CONSTRAINT orders_total_check CHECK (total >= 0),
+    CONSTRAINT check_status_values CHECK (status IN ('PENDING_VALIDATION', 'CONFIRMED', 'READY_TO_SHIP', 'SHIPPED', 'DELIVERED', 'CANCELLED')),
+    CONSTRAINT check_shipping_method CHECK (shipping_method IS NULL OR shipping_method IN ('OWN_TEAM', 'COURIER')),
+    CONSTRAINT orders_cancelled_by_check CHECK (cancelled_by IS NULL OR cancelled_by IN ('CLIENT', 'WAREHOUSE', 'SYSTEM')),
+    CONSTRAINT check_cancellation_consistency CHECK (
+        ((status = 'CANCELLED') AND (cancellation_reason IS NOT NULL) AND (cancelled_at IS NOT NULL)) OR
+        ((status <> 'CANCELLED') AND (cancellation_reason IS NULL) AND (cancelled_at IS NULL))
+    )
+    -- FOREIGN KEY a user_management.users se omite por la arquitectura modular
+);
+
+CREATE SEQUENCE order_management.orders_id_seq START WITH 1 INCREMENT BY 1;
+
+
+CREATE TABLE order_management.order_items (
+    id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    product_name_snapshot VARCHAR(150) NOT NULL,
+    product_image_snapshot VARCHAR(255),
+    quantity INT NOT NULL,
+    unit_price_snapshot NUMERIC(10,2) NOT NULL,
+    -- PostgreSQL GENERATED ALWAYS AS se reemplaza por cálculo en la aplicación o vista
+    -- subtotal NUMERIC(10,2) GENERATED ALWAYS AS (quantity * unit_price_snapshot) STORED,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT order_items_pkey PRIMARY KEY (id),
+    CONSTRAINT order_items_quantity_check CHECK (quantity > 0),
+    CONSTRAINT order_items_unit_price_snapshot_check CHECK (unit_price_snapshot >= 0),
+    CONSTRAINT order_items_order_id_fkey FOREIGN KEY (order_id) REFERENCES order_management.orders(id) ON DELETE CASCADE
+    -- FOREIGN KEY a product_catalog.products se omite por la arquitectura modular
+);
+
+CREATE SEQUENCE order_management.order_items_id_seq START WITH 1 INCREMENT BY 1;
+
+
+CREATE TABLE order_management.order_status_history (
+    id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    from_status VARCHAR(50),
+    to_status VARCHAR(50) NOT NULL,
+    changed_by_user_id BIGINT,
+    changed_by_role VARCHAR(20),
+    notes TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT order_status_history_pkey PRIMARY KEY (id),
+    CONSTRAINT order_status_history_changed_by_role_check CHECK (changed_by_role IS NULL OR changed_by_role IN ('CLIENT', 'WAREHOUSE', 'SYSTEM')),
+    CONSTRAINT order_status_history_order_id_fkey FOREIGN KEY (order_id) REFERENCES order_management.orders(id) ON DELETE CASCADE
+    -- FOREIGN KEY a user_management.users se omite por la arquitectura modular
+);
+
+CREATE SEQUENCE order_management.order_status_history_id_seq START WITH 1 INCREMENT BY 1;
+
+
+-- notification_management
+CREATE TABLE notification_management.notification_preferences (
+    id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    email_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+    whatsapp_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+    whatsapp_number VARCHAR(20),
+    telegram_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+    telegram_chat_id VARCHAR(100),
+    sms_enabled BOOLEAN DEFAULT FALSE NOT NULL,
+    sms_number VARCHAR(20),
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT notification_preferences_pkey PRIMARY KEY (id),
+    CONSTRAINT notification_preferences_user_id_key UNIQUE (user_id)
+    -- FOREIGN KEY a user_management.users se omite por la arquitectura modular
+);
+
+CREATE SEQUENCE notification_management.notification_preferences_id_seq START WITH 1 INCREMENT BY 1;
+
+
+CREATE TABLE notification_management.notification_logs (
+    id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    order_id BIGINT NOT NULL,
+    channel VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    message TEXT,
+    error_detail TEXT,
+    recipient VARCHAR(255),
+    sent_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT notification_logs_pkey PRIMARY KEY (id)
+    -- FOREIGN KEY a user_management.users y order_management.orders se omiten por la arquitectura modular
+);
+
+CREATE SEQUENCE notification_management.notification_logs_id_seq START WITH 1 INCREMENT BY 1;
+
+---
+
+-----------------------------------
+-- 4. ÍNDICES
+-----------------------------------
+
+-- cart
+CREATE INDEX idx_cart_items_cart_id ON cart.cart_items (cart_id);
+CREATE INDEX idx_cart_items_product_id ON cart.cart_items (product_id);
+CREATE INDEX idx_carts_user_id ON cart.carts (user_id);
+
+-- order_management
+CREATE INDEX idx_order_items_order_id ON order_management.order_items (order_id);
+CREATE INDEX idx_order_items_product_id ON order_management.order_items (product_id);
+CREATE INDEX idx_order_status_history_order_id ON order_management.order_status_history (order_id);
+CREATE INDEX idx_orders_user_id ON order_management.orders (user_id);
+CREATE INDEX idx_orders_status ON order_management.orders (status);
+
+-- product_catalog
+CREATE INDEX idx_categories_active ON product_catalog.categories (active);
+CREATE INDEX idx_products_category_id ON product_catalog.products (category_id);
+CREATE INDEX idx_products_active ON product_catalog.products (active);
+CREATE INDEX idx_products_price ON product_catalog.products (price);
+
+-- user_management
+CREATE INDEX idx_users_role_id ON user_management.users (role_id);
+CREATE INDEX idx_users_is_active ON user_management.users (is_active);
+
+-- notification_management
+CREATE INDEX idx_notification_preferences_user_id ON notification_management.notification_preferences (user_id);
+CREATE INDEX idx_notification_logs_user_id ON notification_management.notification_logs (user_id);
+CREATE INDEX idx_notification_logs_order_id ON notification_management.notification_logs (order_id);
+CREATE INDEX idx_notification_logs_status ON notification_management.notification_logs (status);
+
+-- Los triggers deben definirse usando el lenguaje procedural de la BDD de destino
+-- (ej: CREATE TRIGGER ... en PL/pgSQL, PL/SQL, T-SQL).
+-- Se recomienda definir los triggers de 'updated_at' y de actualización de carrito
+-- después de la inicialización de la estructura.
+
+
+-- virtualpet.init.sql (Continuación)
+
+---
+-----------------------------------
+-- 5. POBLACIÓN INICIAL DE DATOS (Initial Data Population)
+-----------------------------------
+
+-- user_management.roles (Roles)
+INSERT INTO user_management.roles (id, name, description, created_at) VALUES
+(1, 'CLIENT', 'Cliente regular del sitio.', CURRENT_TIMESTAMP),
+(2, 'ADMIN', 'Administrador con acceso total.', CURRENT_TIMESTAMP),
+(3, 'WAREHOUSE', 'Personal de almacén/envíos.', CURRENT_TIMESTAMP);
+
+
+-- product_catalog.categories (10 Categorías)
+INSERT INTO product_catalog.categories (id, name, description, active, created_at, updated_at) VALUES
+(1, 'Alimentos Secos', 'Alimentos balanceados y secos para mascotas.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 'Alimentos Húmedos', 'Latas y sobres de comida húmeda.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 'Juguetes', 'Juguetes interactivos, peluches y mordederas.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4, 'Accesorios', 'Correas, collares, bozales y arneses.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 'Camas y Descanso', 'Camas, mantas y casas para mascotas.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(6, 'Higiene y Limpieza', 'Shampoos, cepillos, arenas sanitarias y bolsas.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(7, 'Salud y Suplementos', 'Vitaminas, antipulgas y desparasitantes.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(8, 'Ropa y Calzado', 'Abrigos, camisetas y botitas para mascotas.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(9, 'Golosinas y Snacks', 'Premios, huesos y galletas.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(10, 'Acuarios y Peces', 'Artículos para peces y acuarios.', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+
+INSERT INTO product_catalog.products
+(id, name, description, price, stock, category_id, image_url, active, created_at, updated_at)
+VALUES
+-- 1. Alimentos Secos
+(1, 'Dog Premium Adulto 20kg', 'Alimento seco premium para perros adultos.', 38999, 150, 1, '/img/products/dog_premium_20kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(2, 'Cat Mix Adulto 10kg', 'Alimento seco para gatos adultos, fórmula balanceada.', 21999, 200, 1, '/img/products/cat_mix_10kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(3, 'Dog Cachorro 8kg', 'Alimento para cachorros con alto contenido proteico.', 18499, 120, 1, '/img/products/dog_cachorro_8kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4, 'Gato Esterilizado 7kg', 'Para gatos esterilizados, control del peso.', 19500, 110, 1, '/img/products/gato_esteril_7kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 'Dog Senior 15kg', 'Alimento para perros mayores 7+.', 30999, 60, 1, '/img/products/dog_senior_15kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(6, 'Alimento Perras Gestantes 4kg', 'Alimento especializado para gestación y lactancia.', 12999, 45, 1, '/img/products/perras_gestantes_4kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(7, 'Dog Razas Pequeñas 7kg', 'Croquetas pequeñas para razas mini.', 16500, 140, 1, '/img/products/razas_pequenas_7kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(8, 'Cat Indoor 5kg', 'Alimento para gatos de interior con control de bolas de pelo.', 14500, 130, 1, '/img/products/cat_indoor_5kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(9, 'Dog Carne & Arroz 8kg', 'Con arroz integral y carne natural.', 17999, 95, 1, '/img/products/dog_carne_8kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(10, 'Cat Omega Plus 6kg', 'Con Omega 3 y 6 para piel y pelaje sano.', 16999, 80, 1, '/img/products/cat_omega_6kg.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+
+-- 2. Alimentos Húmedos
+(11, 'Dog Paté Carne 400g', 'Paté húmedo sabor carne.', 1800, 220, 2, '/img/products/pate_carne_400g.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(12, 'Dog Paté Pollo 400g', 'Paté húmedo sabor pollo.', 1850, 215, 2, '/img/products/pate_pollo_400g.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(13, 'Sobre Gato Atún 85g', 'Comida húmeda sabor atún.', 1200, 300, 2, '/img/products/sobre_atun_85g.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(14, 'Sobre Gato Salmón 85g', 'Comida húmeda salmón.', 1250, 310, 2, '/img/products/sobre_salmon_85g.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(15, 'Paté Dog Light 400g', 'Control de calorías.', 1750, 150, 2, '/img/products/pate_light_400g.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(16, 'Dog Estofado Carne 300g', 'Carne en salsa.', 1990, 180, 2, '/img/products/estofado_carne_300g.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(17, 'Dog Estofado Pollo 300g', 'Pollo en salsa.', 2050, 175, 2, '/img/products/estofado_pollo_300g.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(18, 'Gato Paté Pollo 156g', 'Paté digestivo para gatos.', 1650, 160, 2, '/img/products/cat_pate_pollo.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(19, 'Gato Estofado Mix 156g', 'Mix de pescados.', 1750, 130, 2, '/img/products/cat_estofado_mix.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(20, 'Gato Gourmet Pollo 85g', 'Línea super premium.', 2200, 85, 2, '/img/products/gato_gourmet_pollo.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+
+-- 3. Juguetes
+(21,'Pelota con Sonido','Pelota duradera con sonido para perros.',3500,300,3,'/img/products/pelota_sonido.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(22,'Cuerda Trenzada Grande','Cuerda resistente.',4200,250,3,'/img/products/cuerda_grande.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(23,'Ratón de Peluche','Juguete para gatos con catnip.',2500,350,3,'/img/products/raton_peluche.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(24,'Frisbee Flexible','Frisbee de goma resistente.',3800,290,3,'/img/products/frisbee.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(25,'Peluche Pato Chirriante','Peluche con sonido.',4800,80,3,'/img/products/pato_chirr.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(26,'Pelota Interactiva Luz LED','Se enciende al moverse.',6500,95,3,'/img/products/led_ball.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(27,'Túnel para Gatos','Túnel plegable.',9900,60,3,'/img/products/tunel_gatos.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(28,'Kong Classic M','Juguete de goma ultra resistente.',15900,40,3,'/img/products/kong_m.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(29,'Caña Plumero Gatos','Caña con plumas.',3100,200,3,'/img/products/plumero_gatos.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(30,'Hueso Nylon Extra Fuerte','Para masticadores fuertes.',8800,70,3,'/img/products/hueso_nylon.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+
+-- 4. Accesorios
+(31, 'Correa Nylon Roja M', 'Correa resistente de nylon.', 5900, 130, 4, '/img/products/correa_nylon_roja.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(32, 'Collar Azul Ajustable', 'Collar regulable.', 4100, 160, 4, '/img/products/collar_azul.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(33, 'Arnés Pecho Confort S', 'Arnés acolchado.', 10500, 70, 4, '/img/products/arnes_confort_s.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(34, 'Bozal Caniche', 'Bozal pequeño para razas mini.', 4500, 50, 4, '/img/products/bozal_caniche.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(35, 'Transportadora Mediana', 'Transportadora rígida.', 38900, 40, 4, '/img/products/transportadora_m.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(36, 'Pretal Reflectivo L', 'Pretal reflectivo seguridad.', 14900, 35, 4, '/img/products/pretal_reflectivo.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(37, 'Chapa Identificación', 'Placa grabada.', 2500, 300, 4, '/img/products/chapa_id.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(38, 'Cinturón Seguridad Auto', 'Para viajes seguros.', 7200, 90, 4, '/img/products/cinturon_auto.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(39, 'Collar GPS', 'Collar con rastreo.', 45000, 15, 4, '/img/products/collar_gps.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(40, 'Arenero Cerrado Gatos', 'Arenero con filtro.', 25900, 50, 4, '/img/products/arenero.jpg', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+
+-- 5. Camas y Descanso
+(41,'Cama Redonda Premium M','Cama acolchada.',23900,60,5,'/img/products/cama_premium_m.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(42,'Colchón Ortopédico XL','Colchón viscoelástico.',45900,30,5,'/img/products/colchon_xl.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(43,'Cucha Plástica Grande','Cucha resistente.',38900,25,5,'/img/products/cucha_grande.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(44,'Manta Polar G','Manta suave.',6900,120,5,'/img/products/manta_polar_g.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(45,'Cama AutoCalentable S','Retiene calor.',19900,40,5,'/img/products/cama_autocal.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(46,'Manta Impermeable','Para exterior.',17900,35,5,'/img/products/manta_impermeable.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(47,'Cama Cueva Gato','Tipo cuevita.',25900,45,5,'/img/products/cueva_gato.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(48,'Almohadón Eco','Material reciclado.',22900,25,5,'/img/products/almohadon_eco.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(49,'Cama ExtraSoft XL','Ultrasuave.',32900,32,5,'/img/products/extrasoft_xl.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(50,'Cama Antiansiedad','Contenedora anti estrés.',29900,28,5,'/img/products/antistress.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+
+-- 6. Higiene y Limpieza
+(51,'Shampoo Neutro 500ml','Para uso frecuente.',5800,150,6,'/img/products/shampoo_neutro.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(52,'Shampoo Antipulgas 500ml','Con permetrina.',7200,140,6,'/img/products/shampoo_antipulgas.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(53,'Cepillo Doble','Dos caras.',5200,100,6,'/img/products/cepillo.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(54,'Corta Uñas Mascotas','Acero reforzado.',4500,95,6,'/img/products/corta_unas.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(55,'Arena Sanitaria 10L','Absorbente.',8900,200,6,'/img/products/arena_10l.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(56,'Arena Premium 12L','Bentonita.',11900,180,6,'/img/products/arena_premium.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(57,'Bolsas Higiénicas 120u','Biodegradables.',3900,250,6,'/img/products/bolsas_hig.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(58,'Pala Arena Gatos','Plástica.',1800,140,6,'/img/products/pala_arena.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(59,'Perfume Canino Vainilla','Aroma suave.',6700,95,6,'/img/products/perfume_canino.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(60,'Limpiador Orejas 120ml','Para higiene auditiva.',5600,65,6,'/img/products/limpia_orejas.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+
+-- 7. Salud y Suplementos
+(61,'Antipulgas Drop L','Pipetas L.',18900,120,7,'/img/products/drop_l.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(62,'Antipulgas Drop M','Tamaño mediano.',16900,110,7,'/img/products/drop_m.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(63,'Antipulgas Drop S','Razas pequeñas.',14900,150,7,'/img/products/drop_s.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(64,'Calcio Suplemento 120u','Tabletas con minerales.',8900,90,7,'/img/products/calcio.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(65,'Omega 3 Cápsulas 60u','Piel y pelo.',13900,80,7,'/img/products/omega3.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(66,'Vitamina Complejo B','Energizante.',9500,60,7,'/img/products/vitamina_b.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(67,'Probiótico Digestivo','Mejora digestión.',11900,70,7,'/img/products/probiotico.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(68,'Colirio Ocular 10ml','Antiinflamatorio.',7800,65,7,'/img/products/colirio.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(69,'Gel Articular','Para articulaciones.',14900,55,7,'/img/products/gel_articular.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(70,'Desparasitante Oral','Dosis única.',17400,100,7,'/img/products/desparasitante.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+
+-- 8. Ropa y Calzado
+(71,'Buzo Polar XS','Abrigo pequeño.',13900,80,8,'/img/products/buzo_xs.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(72,'Buzo Polar M','Manga larga.',15900,90,8,'/img/products/buzo_m.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(73,'Campera Impermeable L','Impermeable.',24900,60,8,'/img/products/campera_l.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(74,'Botitas Antideslizantes S','Pack x4.',19900,50,8,'/img/products/botitas_s.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(75,'Botitas Antideslizantes M','Pack x4.',21900,45,8,'/img/products/botitas_m.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(76,'Sweater Lana G','Tejido artesanal.',27900,40,8,'/img/products/sweater_g.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(77,'Buzo Termico XL','Deportiva.',28900,30,8,'/img/products/buzo_xl.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(78,'Piloto Transparente','Impermeable liviano.',15900,70,8,'/img/products/piloto_transp.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(79,'Pañuelo Estampado','Accesorio estampado.',4900,110,8,'/img/products/panuelo.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(80,'Medias Acolchonadas','Pack x4.',6900,130,8,'/img/products/medias.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+
+-- 9. Golosinas y Snacks
+(81,'Snacks Huesitos Pollo 500g','Snacks sabor pollo.',8900,200,9,'/img/products/huesitos_pollo.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(82,'Orejas de Cerdo 5u','Snack natural.',4290,180,9,'/img/products/orejas_cerdo.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(83,'Galletas Carne 700g','Snack crunch.',7200,150,9,'/img/products/galletas_carne.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(84,'Bastones Dentales M 12u','Limpieza dental.',9900,140,9,'/img/products/bastones_m.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(85,'Snack Gato Salmon 120g','Snacks blandos.',3900,160,9,'/img/products/snack_salmon_gato.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(86,'Hueso Nudo XL','Masticable resistente.',5500,110,9,'/img/products/hueso_nudo.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(87,'Galletas Forma Hueso 400g','Caseras.',3600,200,9,'/img/products/galletas_hueso.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(88,'Snacks Premios Entrenamiento','Minis.',4200,210,9,'/img/products/entrenamiento.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(89,'Hueso de Pollo con Calcio','Refuerzo óseo.',7900,75,9,'/img/products/hueso_calcio.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(90,'Barras Dental Plus','Control sarro.',5900,145,9,'/img/products/dental_plus.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+
+-- 10. Acuarios y Peces
+(91,'Pecera Vidrio 40L','Pecera vidrio reforzado.',45900,25,10,'/img/products/pecera_40l.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(92,'Filtro Interno 600L/h','Para acuarios medianos.',28900,30,10,'/img/products/filtro_600.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(93,'Termocalentador 150W','Control de temperatura.',19900,35,10,'/img/products/termocalentador.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(94,'Aireador Silencioso','Oxigenación.',15900,40,10,'/img/products/aireador.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(95,'Alimento Escamas Tropical 250g','Comida para peces tropicales.',6200,120,10,'/img/products/alimento_tropical.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(96,'Red Atrapa Peces','Red nylon.',1800,100,10,'/img/products/red_peces.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(97,'Decor Árbol Resina','Decoración acuario.',12900,45,10,'/img/products/arbol_resina.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(98,'Grava Color 2kg','Piedras decorativas.',5900,85,10,'/img/products/grava_color.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(99,'Bomba Aqua 1200L/h','Para circulación.',33900,28,10,'/img/products/bomba_1200.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),
+(100,'Luz LED Sumergible RGB','Iluminación acuarios.',18900,40,10,'/img/products/led_sub.jpg',TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP);
